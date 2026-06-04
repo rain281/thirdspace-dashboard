@@ -11,7 +11,7 @@ import {
   loadProjectBacklog, promoteProjectBacklogItemToToday,
   type WorkspaceStats, type TodoItem, type VaultStats, type TodayWorklog,
   type DailyActivity, type ProjectActivity, type GitActivitySummary,
-  type ProjectBacklogItem, type RecentFile,
+  type ProjectBacklogItem, type RecentFile, type TimelineItem, type TimelineKind,
 } from "./data/vault-reader";
 import {
   PROJECT_DISCOVERY_INBOX_PATH,
@@ -36,6 +36,7 @@ import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-hea
 
 export const VIEW_TYPE = "thirdspace-dashboard";
 type DashboardPage = "today" | "projects";
+type TimelineFilter = "all" | TimelineKind;
 
 // ── Todo Input Modal ──────────────────────────────────────────
 class TodoModal extends Modal {
@@ -74,6 +75,7 @@ export class DashboardView extends ItemView {
   private archivingCompletedTodos = false;
   private archivingStaleTodos = false;
   private activePage: DashboardPage = "today";
+  private timelineFilter: TimelineFilter = "all";
   private snakeRouteCache: SnakeRouteCache | null = null;
   private snakeReplayTimer: number | null = null;
   private readonly singleScreenLimit = {
@@ -604,7 +606,7 @@ export class DashboardView extends ItemView {
 
   // ── Today: ## 今日重点 + ## 今日Todo + ## 重点记录 + event stream ──
   private emptyTodayWorklog(): TodayWorklog {
-    return { highlights: [], todos: [], entries: [], outputs: [], events: [] };
+    return { highlights: [], todos: [], entries: [], outputs: [], events: [], timeline: [] };
   }
 
   private renderTodayWorklog(parent: HTMLElement, today: TodayWorklog, missingLog = false) {
@@ -649,61 +651,98 @@ export class DashboardView extends ItemView {
     }
 
     const flowCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--flow" });
-    flowCard.createDiv({ cls: "ts-today-subhead", text: "时间线 / 产出" });
+    const flowHead = flowCard.createDiv({ cls: "ts-today-subhead ts-timeline-head" });
+    flowHead.createSpan({ cls: "ts-timeline-head-title", text: "时间线 / 产出" });
+    this.renderTimelineFilters(flowHead, today.timeline);
     const flowBody = flowCard.createDiv({ cls: "ts-today-scroll" });
-    let hasFlow = false;
 
-    // 重点记录：时间轴，展示标题和该条记录正文
-    if (today.entries.length > 0) {
-      hasFlow = true;
-      const section = flowBody.createDiv({ cls: "ts-log-section" });
-      const title = section.createDiv({ cls: "ts-log-subtitle", text: "TIMELINE" });
-      title.addEventListener("click", openToday);
-      const tl = section.createDiv({ cls: "ts-log-timeline" });
-      for (const e of today.entries) {
-        const row = tl.createDiv({ cls: "ts-log-tl-row" });
-        row.addEventListener("click", openToday);
-        const head = row.createDiv({ cls: "ts-log-tl-head" });
-        head.createSpan({ cls: "ts-log-time",  text: e.time });
-        head.createSpan({ cls: "ts-log-tl-sep", text: "—" });
-        head.createSpan({ cls: "ts-log-tl-title", text: e.title });
-        if (e.body.length > 0) {
-          const detail = row.createDiv({ cls: "ts-log-tl-detail" });
-          for (const line of e.body) detail.createDiv({ cls: "ts-log-tl-line", text: line });
-        }
-      }
-    }
-
-    // 今日产出：展示当天生成/更新的核心文档和索引
-    if (today.outputs.length > 0) {
-      hasFlow = true;
-      const outputs = flowBody.createDiv({ cls: "ts-log-section" });
-      outputs.createDiv({ cls: "ts-log-subtitle", text: "OUTPUTS" });
-      for (const output of today.outputs) {
-        const row = outputs.createDiv({ cls: "ts-log-output-row" });
-        row.addEventListener("click", openToday);
-        row.createSpan({ cls: "ts-log-output-mark", text: "→" });
-        row.createSpan({ cls: "ts-log-output-title", text: output.raw });
-      }
-    }
-
-    // Agent 产出 / Git 提交：实时流
-    if (today.events.length > 0) {
-      hasFlow = true;
-      const stream = flowBody.createDiv({ cls: "ts-log-section" });
-      stream.createDiv({ cls: "ts-log-subtitle", text: "LIVE" });
-      for (const event of today.events) {
-        const row = stream.createDiv({ cls: `ts-log-event-row ts-log-event--${event.kind}` });
-        row.addEventListener("click", openToday);
-        row.createSpan({ cls: "ts-log-event-kind", text: event.kind === "git" ? "git" : "agent" });
-        if (event.time) row.createSpan({ cls: "ts-log-event-time", text: event.time });
-        row.createSpan({ cls: "ts-log-event-title", text: event.title });
-      }
-    }
-
-    if (!hasFlow) {
+    const visibleTimeline = today.timeline.filter(item =>
+      this.timelineFilter === "all" || item.kind === this.timelineFilter
+    );
+    if (visibleTimeline.length > 0) {
+      const list = flowBody.createDiv({ cls: "ts-timeline-list" });
+      for (const item of visibleTimeline) this.renderTimelineItem(list, item);
+    } else if (today.timeline.length > 0) {
+      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: "No items for this filter" });
+    } else {
       flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示记录/产出" : "No records" });
     }
+  }
+
+  private renderTimelineFilters(parent: HTMLElement, items: TimelineItem[]) {
+    const filters: Array<{ value: TimelineFilter; label: string; count: number }> = [
+      { value: "all", label: "全部", count: items.length },
+      { value: "record", label: "记录", count: items.filter(item => item.kind === "record").length },
+      { value: "output", label: "产出", count: items.filter(item => item.kind === "output").length },
+      { value: "agent", label: "Agent", count: items.filter(item => item.kind === "agent").length },
+      { value: "git", label: "Git", count: items.filter(item => item.kind === "git").length },
+    ];
+
+    const wrap = parent.createDiv({ cls: "ts-timeline-filters" });
+    for (const filter of filters) {
+      const btn = wrap.createEl("button", {
+        cls: `ts-timeline-filter${this.timelineFilter === filter.value ? " is-active" : ""}`,
+      });
+      btn.setAttribute("aria-pressed", this.timelineFilter === filter.value ? "true" : "false");
+      btn.createSpan({ cls: "ts-timeline-filter-label", text: filter.label });
+      btn.createSpan({ cls: "ts-timeline-filter-count", text: String(filter.count) });
+      btn.addEventListener("click", ev => {
+        ev.stopPropagation();
+        this.timelineFilter = filter.value;
+        void this.render();
+      });
+    }
+  }
+
+  private renderTimelineItem(parent: HTMLElement, item: TimelineItem) {
+    const row = parent.createDiv({ cls: `ts-timeline-row ts-timeline-row--${item.kind}` });
+    row.addEventListener("click", () => this.openTimelineItem(item));
+
+    const meta = row.createDiv({ cls: "ts-timeline-meta" });
+    meta.createSpan({ cls: "ts-timeline-badge", text: item.badge });
+    meta.createSpan({ cls: "ts-timeline-time", text: item.time || "----" });
+
+    const copy = row.createDiv({ cls: "ts-timeline-copy" });
+    copy.createDiv({ cls: "ts-timeline-title", text: item.title });
+    if (item.subtitle) copy.createDiv({ cls: "ts-timeline-subtitle", text: item.subtitle });
+    if (item.body.length > 0) {
+      const body = copy.createDiv({ cls: "ts-timeline-detail" });
+      for (const line of item.body.slice(0, 2)) body.createDiv({ cls: "ts-timeline-line", text: line });
+    }
+  }
+
+  private async openTimelineItem(item: TimelineItem) {
+    if (item.targetPath) {
+      const target = this.resolveTimelineTarget(item.targetPath, item.sourcePath);
+      if (target) {
+        await this.app.workspace.getLeaf(false).openFile(target);
+        return;
+      }
+    }
+    await this.openFile(item.sourcePath || getTodayWorklogPath());
+  }
+
+  private resolveTimelineTarget(rawTarget: string, sourcePath: string): TFile | null {
+    if (/^https?:\/\//i.test(rawTarget)) return null;
+    const target = this.cleanTimelineTarget(rawTarget);
+    const direct = this.app.vault.getAbstractFileByPath(target) as TFile | null;
+    if (direct) return direct;
+
+    const withMd = target.endsWith(".md") ? target : `${target}.md`;
+    const mdFile = this.app.vault.getAbstractFileByPath(withMd) as TFile | null;
+    if (mdFile) return mdFile;
+
+    const linkPath = target.replace(/\.md$/i, "");
+    return this.app.metadataCache.getFirstLinkpathDest(linkPath, sourcePath) as TFile | null;
+  }
+
+  private cleanTimelineTarget(rawTarget: string): string {
+    let target = rawTarget.trim().replace(/^<|>$/g, "").split("#")[0];
+    try { target = decodeURIComponent(target); } catch {}
+    target = target.replace(/^file:\/\//, "");
+    const vaultRoot = "/Volumes/资料/projects/thirdspace/rain/";
+    if (target.startsWith(vaultRoot)) target = target.slice(vaultRoot.length);
+    return target.replace(/^\.\/+/, "").replace(/^\/+/, "");
   }
 
   private renderInlineMore(parent: HTMLElement, count: number) {

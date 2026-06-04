@@ -7,6 +7,9 @@ const _tsFmt   = new Intl.DateTimeFormat("sv-SE", {
   year: "numeric", month: "2-digit", day: "2-digit",
   hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
 });
+const _timeFmt = new Intl.DateTimeFormat("sv-SE", {
+  hour: "2-digit", minute: "2-digit", hour12: false,
+});
 
 export function localDateStr(d: Date): string     { return _dateFmt.format(d); }             // "2026-05-27"
 export function localDateCompact(d: Date): string { return _dateFmt.format(d).replace(/-/g,""); } // "20260527"
@@ -50,9 +53,23 @@ export interface TodoItem        { text: string; done: boolean; }
 export interface VaultStats      { total: number; thisWeek: number; thisMonth: number; activeDays: number; }
 export interface RecentFile      { path: string; name: string; workspace: string; mtime: number; }
 export interface WorklogEntry    { time: string; title: string; body: string[]; }
-export interface WorklogEvent    { kind: "agent" | "git"; time: string; title: string; }
-export interface WorklogOutput   { title: string; raw: string; }
-export interface TodayWorklog    { highlights: string[]; todos: TodoItem[]; entries: WorklogEntry[]; outputs: WorklogOutput[]; events: WorklogEvent[]; }
+export interface WorklogEvent    { kind: "agent" | "git"; time: string; title: string; timestamp: number; raw: string; }
+export interface WorklogOutput   { title: string; raw: string; targetPath?: string; subtitle?: string; badge: string; }
+export type TimelineKind = "record" | "output" | "agent" | "git";
+export interface TimelineItem {
+  id: string;
+  kind: TimelineKind;
+  time: string;
+  timestamp: number;
+  title: string;
+  body: string[];
+  raw: string;
+  sourcePath: string;
+  targetPath?: string;
+  subtitle?: string;
+  badge: string;
+}
+export interface TodayWorklog    { highlights: string[]; todos: TodoItem[]; entries: WorklogEntry[]; outputs: WorklogOutput[]; events: WorklogEvent[]; timeline: TimelineItem[]; }
 export interface ProjectBacklogItem { text: string; project: string; path: string; source: string; }
 
 const PROJECT_UNFINISHED_NAME = "未完成事项.md";
@@ -893,19 +910,35 @@ export async function renameTodoInWorklog(app: App, item: TodoItem, newText: str
 // ── Today's worklog entries (## 今日重点 / 今日Todo / 重点记录 / event stream) ──
 export async function loadTodayWorklog(app: App): Promise<TodayWorklog | null> {
   try {
-    const today = localDateStr(new Date()).replace(/-/g,"");
-    const logFile = app.vault.getMarkdownFiles().find(f =>
-      f.path.startsWith("02-日记/工作日志/") && f.basename.startsWith(today)
-    );
-    if (!logFile) return null;
-    const md = await app.vault.read(logFile);
+    const now = new Date();
+    const todayDate = localDateStr(now);
+    const todayCompact = todayDate.replace(/-/g,"");
+    const logPath = await findTodayWorklogPath(app, todayCompact);
+    if (!logPath) return null;
+    const md = await app.vault.adapter.read(logPath);
     const highlights = parseHighlights(md);
     const todos      = parseTodosFromMd(md);
     const entries    = parseWorklogEntries(md);
     const outputs    = parseWorklogOutputs(md);
     const events     = parseWorklogEvents(md);
-    return { highlights, todos, entries, outputs, events };
+    const timeline = mergeTimelineItems([
+      ...buildWorklogTimelineItems(logPath, todayDate, entries, outputs, events),
+      ...await loadStructuredTimelineItems(app, logPath, todayCompact, todayDate),
+    ]);
+    return { highlights, todos, entries, outputs, events, timeline };
   } catch { return null; }
+}
+
+async function findTodayWorklogPath(app: App, todayCompact: string): Promise<string | null> {
+  const exact = getTodayWorklogPath();
+  if (await app.vault.adapter.exists(exact).catch(() => false)) return exact;
+
+  const dir = "02-日记/工作日志";
+  const listing = await app.vault.adapter.list(dir).catch(() => null);
+  if (!listing) return null;
+  return listing.files
+    .filter(path => path.toLowerCase().endsWith(".md"))
+    .find(path => (path.split("/").pop() ?? "").startsWith(todayCompact)) ?? null;
 }
 
 /** 读取 ## 今日重点 下的非空行（去掉 Markdown 格式符） */
@@ -961,22 +994,47 @@ export function parseWorklogOutputs(md: string): WorklogOutput[] {
     if (!inSection) continue;
     const raw = line.replace(/^[-*]\s+/, "").trim();
     if (!raw) continue;
-    outputs.push({ raw, title: displayTitleFromOutput(raw) });
+    outputs.push({ raw, ...parseOutputDisplay(raw) });
   }
   return outputs.reverse();
 }
 
-function displayTitleFromOutput(raw: string): string {
-  const wiki = raw.match(/^\[\[(?:[^|\]]+\|)?([^\]]+)\]\]$/);
-  if (wiki) return wiki[1].trim();
+function parseOutputDisplay(raw: string): Omit<WorklogOutput, "raw"> {
+  const cleaned = raw.replace(/✅ \d{4}-\d{2}-\d{2}/g, "").trim();
+  const wiki = cleaned.match(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
+  if (wiki) {
+    const targetPath = wiki[1].trim();
+    return {
+      title: (wiki[2] ?? basenameFromPath(targetPath)).replace(/\.md$/i, "").trim(),
+      targetPath,
+      subtitle: targetPath,
+      badge: outputBadge(targetPath),
+    };
+  }
 
-  const md = raw.match(/^\[([^\]]+)\]\([^)]+\)$/);
-  if (md) return md[1].trim();
+  const md = cleaned.match(/\[([^\]]+)\]\(([^)]+)\)/);
+  if (md) {
+    const targetPath = md[2].trim();
+    return {
+      title: md[1].trim(),
+      targetPath: /^https?:\/\//i.test(targetPath) ? undefined : targetPath,
+      subtitle: targetPath,
+      badge: outputBadge(targetPath),
+    };
+  }
 
-  const code = raw.match(/^`(.+)`$/);
-  const value = (code?.[1] ?? raw).trim();
-  const file = value.split("/").filter(Boolean).pop() ?? value;
-  return file.replace(/\.md$/i, "").trim();
+  const code = cleaned.match(/`([^`]+)`/);
+  const value = (code?.[1] ?? cleaned).trim();
+  const barePath = value.match(/(?:^|[\s；;：:])((?:0[0-6]|99|\.thirdspace|docs|src)[^`，,；;\s]+\.md)/);
+  const targetPath = code?.[1] ?? barePath?.[1];
+  const titleSource = targetPath ?? value;
+  const file = titleSource.split("/").filter(Boolean).pop() ?? titleSource;
+  return {
+    title: file.replace(/\.md$/i, "").trim(),
+    targetPath,
+    subtitle: targetPath && targetPath !== cleaned ? targetPath : undefined,
+    badge: outputBadge(targetPath ?? cleaned),
+  };
 }
 
 /** 读取 ## Agent 产出 / ## Git 提交 下的事件行，作为 Today 实时流 */
@@ -993,10 +1051,302 @@ export function parseWorklogEvents(md: string): WorklogEvent[] {
     if (!text) continue;
 
     const m = text.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})(?::\d{2})?\s+(.+)/);
-    const time = m?.[2] ?? "";
+    const timestamp = m ? parseLocalTimestamp(`${m[1]} ${m[2]}:00`) : 0;
+    const time = timestamp ? localTimeFromTimestamp(timestamp) : (m?.[2] ?? "");
     const rest = (m?.[3] ?? text).trim();
     const title = rest || text;
-    events.push({ kind: current, time, title });
+    events.push({ kind: current, time, title, timestamp, raw: text });
   }
   return events.reverse();
+}
+
+function buildWorklogTimelineItems(
+  sourcePath: string,
+  todayDate: string,
+  entries: WorklogEntry[],
+  outputs: WorklogOutput[],
+  events: WorklogEvent[],
+): TimelineItem[] {
+  const items: TimelineItem[] = [];
+
+  for (const entry of entries) {
+    const timestamp = parseLocalTimestamp(`${todayDate} ${entry.time}:00`);
+    items.push({
+      id: `record:${todayDate}:${entry.time}:${normalizeKey(entry.title)}`,
+      kind: "record",
+      time: entry.time,
+      timestamp,
+      title: entry.title,
+      body: entry.body.slice(0, 3),
+      raw: [entry.title, ...entry.body].join("\n"),
+      sourcePath,
+      badge: "记录",
+    });
+  }
+
+  for (const output of outputs) {
+    const timestamp = parseTimestampFromText(output.raw);
+    items.push({
+      id: `output:${normalizeKey(output.targetPath ?? output.raw)}`,
+      kind: "output",
+      time: timestamp ? localTimeFromTimestamp(timestamp) : "",
+      timestamp,
+      title: output.title,
+      body: [],
+      raw: output.raw,
+      sourcePath,
+      targetPath: output.targetPath,
+      subtitle: output.subtitle,
+      badge: output.badge,
+    });
+  }
+
+  for (const event of events) {
+    const eventId = eventIdFromText(event.raw) ?? normalizeKey(event.title);
+    const targetPath = firstBacktickPath(event.raw);
+    items.push({
+      id: event.kind === "git"
+        ? `git:${commitIdFromText(event.raw) ?? eventId}`
+        : `agent:${eventId}`,
+      kind: event.kind,
+      time: event.time,
+      timestamp: event.timestamp,
+      title: cleanEventTitle(event.title),
+      body: [],
+      raw: event.raw,
+      sourcePath,
+      targetPath,
+      subtitle: event.kind === "git" ? gitSubtitleFromText(event.raw) : targetPath,
+      badge: event.kind === "git" ? "Git" : "Agent",
+    });
+  }
+
+  return items;
+}
+
+async function loadStructuredTimelineItems(
+  app: App,
+  sourcePath: string,
+  todayCompact: string,
+  todayDate: string,
+): Promise<TimelineItem[]> {
+  const [eventItems, gitIndexItems] = await Promise.all([
+    loadStructuredEventFile(app, sourcePath, todayCompact, todayDate),
+    loadGitIndexTimelineItems(app, sourcePath, todayDate),
+  ]);
+  return [...eventItems, ...gitIndexItems];
+}
+
+async function loadStructuredEventFile(
+  app: App,
+  sourcePath: string,
+  todayCompact: string,
+  todayDate: string,
+): Promise<TimelineItem[]> {
+  const raw = await app.vault.adapter.read(`.thirdspace/events/${todayCompact}.ndjson`).catch(() => "");
+  if (!raw) return [];
+  const items: TimelineItem[] = [];
+  for (const line of raw.split("\n")) {
+    const text = line.trim();
+    if (!text) continue;
+    try {
+      const event = JSON.parse(text) as StructuredGitEvent;
+      const item = gitEventToTimelineItem(event, sourcePath, todayDate);
+      if (item) items.push(item);
+    } catch {}
+  }
+  return items;
+}
+
+async function loadGitIndexTimelineItems(app: App, sourcePath: string, todayDate: string): Promise<TimelineItem[]> {
+  const raw = await app.vault.adapter.read(".thirdspace/git/commits.json").catch(() => "");
+  if (!raw) return [];
+  try {
+    const data = JSON.parse(raw) as GitIndexFile;
+    const items: TimelineItem[] = [];
+    for (const repo of data.repos ?? []) {
+      for (const commit of repo.commits ?? []) {
+        const item = gitEventToTimelineItem({
+          type: "git_commit",
+          timestamp: commit.time,
+          repo: repo.path,
+          repo_name: repo.name ?? repo.id,
+          branch: commit.branch ?? repo.branch,
+          commit: commit.hash,
+          commit_short: commit.short_hash,
+          subject: commit.subject,
+          files: commit.files,
+        }, sourcePath, todayDate);
+        if (item) items.push(item);
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+interface StructuredGitEvent {
+  type?: string;
+  timestamp?: string;
+  repo?: string;
+  repo_name?: string;
+  branch?: string;
+  commit?: string;
+  commit_short?: string;
+  subject?: string;
+  files?: string[];
+}
+
+interface GitIndexFile {
+  repos?: Array<{
+    id?: string;
+    name?: string;
+    path?: string;
+    branch?: string;
+    commits?: Array<{
+      hash?: string;
+      short_hash?: string;
+      time?: string;
+      subject?: string;
+      branch?: string;
+      files?: string[];
+    }>;
+  }>;
+}
+
+function gitEventToTimelineItem(event: StructuredGitEvent, sourcePath: string, todayDate: string): TimelineItem | null {
+  if (event.type && event.type !== "git_commit") return null;
+  const timestamp = parseFlexibleTimestamp(event.timestamp);
+  if (!timestamp || localDateStr(new Date(timestamp)) !== todayDate) return null;
+
+  const hash = event.commit ?? "";
+  const short = event.commit_short ?? hash.slice(0, 7);
+  const repoName = event.repo_name ?? repoNameFromPath(event.repo) ?? "repo";
+  const branch = event.branch ?? "";
+  const subject = event.subject ?? "Git commit";
+  const files = Array.isArray(event.files) ? event.files : [];
+  const targetPath = targetPathFromGitFiles(event.repo, files);
+  const fileCount = files.length > 0 ? `${files.length} files` : "no file list";
+  const subtitle = [repoName, branch, short, fileCount].filter(Boolean).join(" · ");
+
+  return {
+    id: `git:${hash || `${repoName}:${short}:${normalizeKey(subject)}`}`,
+    kind: "git",
+    time: localTimeFromTimestamp(timestamp),
+    timestamp,
+    title: `${repoName}: ${subject}`,
+    body: files.slice(0, 3),
+    raw: subject,
+    sourcePath,
+    targetPath,
+    subtitle,
+    badge: "Git",
+  };
+}
+
+function mergeTimelineItems(items: TimelineItem[]): TimelineItem[] {
+  const merged = new Map<string, TimelineItem>();
+  for (const item of items) {
+    const key = item.id || `${item.kind}:${normalizeKey(item.title)}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...item, body: uniqueStrings(item.body) });
+      continue;
+    }
+
+    existing.timestamp = Math.max(existing.timestamp, item.timestamp);
+    existing.time = existing.timestamp ? localTimeFromTimestamp(existing.timestamp) : (existing.time || item.time);
+    if (!existing.targetPath && item.targetPath) existing.targetPath = item.targetPath;
+    if (!existing.subtitle && item.subtitle) existing.subtitle = item.subtitle;
+    if (item.body.length > existing.body.length) existing.body = uniqueStrings([...existing.body, ...item.body]).slice(0, 4);
+    if (item.title.length > existing.title.length && !existing.title.includes(item.title)) existing.title = item.title;
+  }
+
+  const kindRank: Record<TimelineKind, number> = { record: 0, output: 1, agent: 2, git: 3 };
+  return [...merged.values()].sort((a, b) => {
+    if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return b.timestamp - a.timestamp;
+    if (a.timestamp && !b.timestamp) return -1;
+    if (!a.timestamp && b.timestamp) return 1;
+    return kindRank[a.kind] - kindRank[b.kind] || a.title.localeCompare(b.title);
+  });
+}
+
+function parseLocalTimestamp(value: string): number {
+  return parseFlexibleTimestamp(value.replace(" ", "T"));
+}
+
+function parseFlexibleTimestamp(value: unknown): number {
+  if (!value || typeof value !== "string") return 0;
+  const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
+    ? value
+    : value.replace(" ", "T");
+  const ts = new Date(normalized).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function parseTimestampFromText(text: string): number {
+  const m = text.match(/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})(?::(\d{2}))?/);
+  if (!m) return 0;
+  return parseLocalTimestamp(`${m[1]} ${m[2]}:${m[3] ?? "00"}`);
+}
+
+function localTimeFromTimestamp(timestamp: number): string {
+  if (!timestamp) return "";
+  return _timeFmt.format(new Date(timestamp));
+}
+
+function outputBadge(pathOrText: string): string {
+  const value = pathOrText.toLowerCase();
+  if (value.includes("spec") || value.includes("规格")) return "规格";
+  if (value.includes("plan") || value.includes("计划")) return "计划";
+  if (value.includes("日志") || value.includes("worklog")) return "日志";
+  if (value.endsWith(".md") || value.includes("[[")) return "文档";
+  return "产出";
+}
+
+function eventIdFromText(text: string): string | null {
+  return text.match(/\[(agent_event:[^\]]+)\]/)?.[1] ?? null;
+}
+
+function commitIdFromText(text: string): string | null {
+  return text.match(/\[git_commit:([a-f0-9]{7,40})\]/i)?.[1]
+    ?? text.match(/\b([a-f0-9]{40})\b/i)?.[1]
+    ?? null;
+}
+
+function firstBacktickPath(text: string): string | undefined {
+  const matches = [...text.matchAll(/`([^`]+)`/g)].map(m => m[1].trim());
+  return matches.find(value => value.includes("/") && !value.startsWith("/"));
+}
+
+function cleanEventTitle(title: string): string {
+  return title.replace(/\[(?:agent_event|git_commit):[^\]]+\]\s*/g, "").trim();
+}
+
+function gitSubtitleFromText(text: string): string | undefined {
+  const m = text.match(/`([^`]+)`\s+([^\s]+)\s+([a-f0-9]{7,})/i);
+  if (m) return [m[1], m[2], m[3]].join(" · ");
+  const hash = commitIdFromText(text);
+  return hash ? hash.slice(0, 7) : undefined;
+}
+
+function repoNameFromPath(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  return path.split("/").filter(Boolean).pop();
+}
+
+function targetPathFromGitFiles(repoPath: string | undefined, files: string[]): string | undefined {
+  if (!repoPath?.endsWith("/thirdspace/rain")) return undefined;
+  return files.find(path => !path.startsWith(".git/"));
+}
+
+function normalizeKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/✅ \d{4}-\d{2}-\d{2}/g, "")
+    .replace(/\[(?:agent_event|git_commit):[^\]]+\]/g, "")
+    .replace(/[`*_~[\]()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
