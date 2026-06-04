@@ -7,13 +7,14 @@ import type { Snake } from "../snk/types-snake";
 import type { SnakeCell } from "../data/worklog-parser";
 
 const MOONLIT_DRAW_OPTIONS = {
-  colorDots: { 1: "#C4A882", 2: "#A8845A", 3: "#B5392A", 4: "#8B1A0A" } as Record<1|2|3|4, string>,
-  colorEmpty: "#E4D8C8",
+  colorDots: { 1: "#B9DDFF", 2: "#7AB8FF", 3: "#0A84FF", 4: "#005EC8" } as Record<1|2|3|4, string>,
+  colorEmpty: "#E5E5EA",
   colorDotBorder: "transparent",
-  colorSnake: "#B5392A",
+  colorSnake: "#0A84FF",
   sizeCell: 14,
   sizeDot: 10,
-  sizeDotBorderRadius: 2,
+  sizeDotBorderRadius: 3,
+  showStack: false,
 };
 
 const MONTHS   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -41,11 +42,11 @@ function getStartDate(): Date {
 function addDateLabels(svgEl: SVGElement): void {
   const sz = MOONLIT_DRAW_OPTIONS.sizeCell;
   const ns = "http://www.w3.org/2000/svg";
-  const fill = "#8A7968", font = '"JetBrains Mono","Fira Code",monospace';
+  const fill = "#8E8E93", font = '"SF Mono","Menlo","Monaco",monospace';
 
   const vbStr = svgEl.getAttribute("viewBox") || "-14 -28 770 168";
   const vb = vbStr.split(/\s+/).map(Number) as [number,number,number,number];
-  const EL = 30, EB = 18;
+  const EL = 34, EB = 20;
   svgEl.setAttribute("viewBox", `${vb[0]-EL} ${vb[1]} ${vb[2]+EL} ${vb[3]+EB}`);
   svgEl.setAttribute("height", String(parseInt(svgEl.getAttribute("height")||"168") + EB));
 
@@ -55,7 +56,7 @@ function addDateLabels(svgEl: SVGElement): void {
     t.setAttribute("x", String(vb[0] - 4));
     t.setAttribute("y", String(d * sz + sz/2 + 3));
     t.setAttribute("text-anchor","end"); t.setAttribute("dominant-baseline","middle");
-    t.setAttribute("font-size","9"); t.setAttribute("fill",fill); t.setAttribute("font-family",font);
+    t.setAttribute("font-size","10.5"); t.setAttribute("fill",fill); t.setAttribute("font-family",font);
     t.textContent = DAY_LBLS[d]; svgEl.appendChild(t);
   }
 
@@ -68,7 +69,7 @@ function addDateLabels(svgEl: SVGElement): void {
       const t = document.createElementNS(ns, "text") as SVGTextElement;
       t.setAttribute("x", String(w * sz + 1));
       t.setAttribute("y", String(7 * sz + 12));
-      t.setAttribute("text-anchor","start"); t.setAttribute("font-size","9");
+      t.setAttribute("text-anchor","start"); t.setAttribute("font-size","10.5");
       t.setAttribute("fill",fill); t.setAttribute("font-family",font);
       t.textContent = MONTHS[month]; svgEl.appendChild(t);
       lastMonth = month;
@@ -84,7 +85,14 @@ function injectAndPlay(container: HTMLElement, svg: string): void {
   if (!svgEl) return;
 
   addDateLabels(svgEl);
-  svgEl.setAttribute("width","100%");
+  const viewBox = svgEl.getAttribute("viewBox")?.split(/\s+/).map(Number);
+  if (viewBox && viewBox.length === 4) {
+    svgEl.setAttribute("width", String(Math.ceil(viewBox[2])));
+    svgEl.setAttribute("height", String(Math.ceil(viewBox[3])));
+  }
+  svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svgEl.style.width = "100%";
+  svgEl.style.height = "100%";
   svgEl.style.maxWidth = "100%";
 
   // 強制所有 CSS animation 重新播放

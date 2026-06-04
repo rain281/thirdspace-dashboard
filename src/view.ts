@@ -1,17 +1,41 @@
-import { ItemView, Modal, WorkspaceLeaf, TFile } from "obsidian";
+import { ItemView, Modal, Notice, WorkspaceLeaf, TFile, TAbstractFile, setIcon } from "obsidian";
 import type ThirdSpaceDashboard from "./main";
 import {
   loadWorkspaceIndex, getWorkspaceStats, getDailyActivity,
   loadProductStatus, parseProducts, getRecentFiles,
+  getProjectActivity, getGitActivity,
   localDateStr, localDateCompact, localTimestamp,
   loadTodos, loadTodayWorklog, getVaultStats, getTodayWorklogPath,
-  addTodoToWorklog, toggleTodoInWorklog, renameTodoInWorklog,
+  ensureTodayWorklog, addTodoToWorklog, toggleTodoInWorklog, renameTodoInWorklog, archiveCompletedTodosInWorklog,
+  archiveStaleTodosToProjectBacklog,
+  loadProjectBacklog, promoteProjectBacklogItemToToday,
   type WorkspaceStats, type TodoItem, type VaultStats, type TodayWorklog,
+  type DailyActivity, type ProjectActivity, type GitActivitySummary,
+  type ProjectBacklogItem,
 } from "./data/vault-reader";
+import {
+  PROJECT_DISCOVERY_INBOX_PATH,
+  acceptProjectCandidate,
+  ignoreProjectCandidate,
+  refreshProjectDiscovery,
+  type ProjectCandidate,
+  type ProjectDiscoverySummary,
+} from "./data/project-discovery";
+import {
+  loadProjectOnboarding,
+  runProjectOnboarding,
+  type ProjectOnboardingItem,
+} from "./data/project-onboarding";
+import {
+  loadProjectMaterials,
+  runProjectMaterialsImport,
+  type ProjectMaterialsItem,
+} from "./data/project-materials";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
+type DashboardPage = "today" | "projects";
 
 // ── Todo Input Modal ──────────────────────────────────────────
 class TodoModal extends Modal {
@@ -46,8 +70,22 @@ class TodoModal extends Modal {
 export class DashboardView extends ItemView {
   plugin: ThirdSpaceDashboard;
   private timer: number | null = null;
+  private liveRenderTimer: number | null = null;
+  private archivingCompletedTodos = false;
+  private archivingStaleTodos = false;
+  private activePage: DashboardPage = "today";
   private snakeRouteCache: SnakeRouteCache | null = null;
   private snakeReplayTimer: number | null = null;
+  private readonly singleScreenLimit = {
+    todos: 5,
+    highlights: 3,
+    entries: 2,
+    outputs: 6,
+    events: 4,
+    recent: 3,
+    products: 5,
+    materials: 5,
+  };
 
   constructor(leaf: WorkspaceLeaf, plugin: ThirdSpaceDashboard) {
     super(leaf); this.plugin = plugin;
@@ -57,20 +95,37 @@ export class DashboardView extends ItemView {
   getDisplayText() { return "ThirdSpace"; }
   getIcon()        { return "layout-dashboard"; }
 
-  async onOpen()  { this.containerEl.addClass("ts-root"); await this.render(); this.timer = window.setInterval(() => this.render(), 60_000); }
-  onClose()       { if (this.timer) { clearInterval(this.timer); this.timer = null; } if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; } return Promise.resolve(); }
+  async onOpen()  {
+    this.containerEl.addClass("ts-root");
+    await this.render();
+    this.timer = window.setInterval(() => this.render(), 60_000);
+    this.registerLiveRefresh();
+  }
+  onClose()       {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.liveRenderTimer) { clearTimeout(this.liveRenderTimer); this.liveRenderTimer = null; }
+    if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; }
+    return Promise.resolve();
+  }
 
   async render() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("ts-dash");
+    await this.archiveStaleTodosFromOldWorklogs();
 
-    const [wsIndex, productMd, activity, todos, todayWorklog] = await Promise.all([
+    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials] = await Promise.all([
       loadWorkspaceIndex(this.app),
       loadProductStatus(this.app),
       getDailyActivity(this.app, 365),
+      getProjectActivity(this.app, 90),
+      getGitActivity(this.app, 90),
       loadTodos(this.app),
+      loadProjectBacklog(this.app),
       loadTodayWorklog(this.app),
+      refreshProjectDiscovery(this.app),
+      loadProjectOnboarding(this.app),
+      loadProjectMaterials(this.app),
     ]);
 
     const wsDirs    = wsIndex?.map(e => e.dir) ?? [];
@@ -78,98 +133,330 @@ export class DashboardView extends ItemView {
     const vaultStats = getVaultStats(this.app);
     const recent    = getRecentFiles(this.app, 7);
     const products  = productMd ? parseProducts(productMd) : [];
-    const snakeCells = buildSnakeCells(activity);
     const pending   = todos.filter(t => !t.done);
 
-    // ── Header
+    // ── macOS dashboard shell
     const hdr = contentEl.createDiv({ cls: "ts-hdr" });
     const hdrL = hdr.createDiv({ cls: "ts-hdr-left" });
-    hdrL.createDiv({ cls: "ts-vault-title", text: (this.app.vault as any).getName?.() ?? "Vault" });
+    const titleBlock = hdrL.createDiv({ cls: "ts-title-block" });
+    titleBlock.createDiv({ cls: "ts-app-title", text: "ThirdSpace" });
+    titleBlock.createDiv({ cls: "ts-vault-title", text: (this.app.vault as any).getName?.() ?? "Vault" });
     const pill = hdrL.createDiv({ cls: `ts-pill ${wsIndex ? "ts-pill--ok" : "ts-pill--warn"}` });
     pill.setText(wsIndex ? `${wsStats.length} workspaces` : "no .thirdspace");
-    const refreshBtn = hdr.createDiv({ cls: "ts-hdr-right" }).createEl("button", { cls: "ts-icon-btn", text: "↻" });
+    if (discovery.pending.length > 0 || discovery.error) {
+      const discoveryPill = hdrL.createDiv({
+        cls: `ts-pill ${discovery.error ? "ts-pill--warn" : "ts-pill--notice"}`,
+        text: discovery.error ? "project scan issue" : `${discovery.pending.length} project candidates`,
+      });
+      discoveryPill.addEventListener("click", () => this.openFile(PROJECT_DISCOVERY_INBOX_PATH));
+    }
+    const refreshBtn = hdr.createDiv({ cls: "ts-hdr-right" }).createEl("button", {
+      cls: "ts-icon-btn",
+      attr: { "aria-label": "Refresh dashboard", title: "刷新 Dashboard" },
+    });
+    setIcon(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", () => { this.snakeRouteCache = null; this.render(); });
 
-    // ── Stats row
-    this.renderStatsRow(contentEl, vaultStats, activity.filter(a=>a.count>0).length);
+    const board = contentEl.createDiv({ cls: `ts-board ts-board--${this.activePage}` });
+    if (this.activePage === "today") {
+      this.renderTodayPage(board, vaultStats, activity, todos, projectBacklog, todayWorklog);
+    } else {
+      this.renderProjectsPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
+    }
+    this.renderPageSwitch(contentEl);
 
-    // ── Snake heatmap
-    const heatSec  = contentEl.createDiv({ cls: "ts-card ts-heatmap-card" });
-    const heatHd   = heatSec.createDiv({ cls: "ts-card-head" });
-    heatHd.createSpan({ cls: "ts-card-label", text: "ACTIVITY · PAST YEAR" });
-    const streak = this.calcStreak(activity);
-    if (streak > 0) heatHd.createSpan({ cls: "ts-card-meta", text: `⚡ ${streak}d streak` });
-    const heatBody = heatSec.createDiv({ cls: "ts-heatmap-body" });
+  }
 
-    // 清除舊的 replay timer（本次全量刷新會重新建立）
-    if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; }
+  private renderTodayPage(
+    board: HTMLElement,
+    vaultStats: VaultStats,
+    activity: DailyActivity[],
+    todos: TodoItem[],
+    projectBacklog: ProjectBacklogItem[],
+    todayWorklog: TodayWorklog | null,
+  ) {
+    const pending = todos.filter(t => !t.done);
 
-    window.setTimeout(async () => {
-      const cache = await renderSnakeHeatmap(heatBody, snakeCells, this.snakeRouteCache ?? undefined);
-      if (cache) {
-        this.snakeRouteCache = cache;
-        this.scheduleSnakeReplay(heatBody, snakeCells, cache.durationMs);
-      }
-    }, 0);
+    const overviewCol = board.createDiv({ cls: "ts-board-col ts-overview-col" });
+    const overviewCard = overviewCol.createDiv({ cls: "ts-card ts-compact-card ts-overview-card" });
+    overviewCard.createDiv({ cls: "ts-card-label", text: "OVERVIEW" });
+    this.renderStatsRow(overviewCard, vaultStats, activity.filter(a=>a.count>0).length);
 
-    // ── Two columns
-    const main  = contentEl.createDiv({ cls: "ts-main" });
-    const left  = main.createDiv({ cls: "ts-left" });
-    const right = main.createDiv({ cls: "ts-right" });
+    const quickCol = board.createDiv({ cls: "ts-board-col ts-quick-col" });
+    const actCard = quickCol.createDiv({ cls: "ts-card ts-compact-card ts-quick-card" });
+    actCard.createDiv({ cls: "ts-card-label", text: "QUICK" });
+    this.renderActions(actCard);
 
-    // LEFT: workspaces
-    const wsCard = left.createDiv({ cls: "ts-card" });
-    wsCard.createDiv({ cls: "ts-card-label", text: "WORKSPACES" });
-    this.renderWorkspaces(wsCard, wsStats);
+    const todayCol = board.createDiv({ cls: "ts-board-col ts-today-col" });
+    const logCard = todayCol.createDiv({ cls: "ts-card ts-compact-card ts-today-card" });
+    const logHd   = logCard.createDiv({ cls: "ts-card-head" });
+    logHd.createSpan({ cls: "ts-card-label", text: "TODAY" });
+    logHd.createSpan({ cls: "ts-card-meta", text: new Date().toLocaleDateString("zh-CN",{month:"short",day:"numeric",weekday:"short"}) });
+    this.renderTodayWorklog(logCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog);
 
-    // LEFT: todos
-    const todoCard = left.createDiv({ cls: "ts-card ts-todo-card" });
+    const todoCol = board.createDiv({ cls: "ts-board-col ts-todo-col" });
+    const todoCard = todoCol.createDiv({ cls: "ts-card ts-compact-card ts-todo-card" });
     const tdHd = todoCard.createDiv({ cls: "ts-card-head" });
     tdHd.createSpan({ cls: "ts-card-label", text: "TODAY'S TODOS" });
     const tdMeta = tdHd.createSpan({ cls: "ts-card-meta ts-todo-meta" });
     if (pending.length > 0) tdMeta.setText(`${pending.length} pending`);
     this.renderTodos(todoCard, todos);
 
-    // RIGHT: today's worklog
-    if (todayWorklog) {
-      const logCard = right.createDiv({ cls: "ts-card" });
-      const logHd   = logCard.createDiv({ cls: "ts-card-head" });
-      logHd.createSpan({ cls: "ts-card-label", text: "TODAY" });
-      logHd.createSpan({ cls: "ts-card-meta", text: new Date().toLocaleDateString("zh-CN",{month:"short",day:"numeric",weekday:"short"}) });
-      this.renderTodayWorklog(logCard, todayWorklog);
-    }
+    const backlogCol = board.createDiv({ cls: "ts-board-col ts-backlog-col" });
+    const backlogCard = backlogCol.createDiv({ cls: "ts-card ts-compact-card ts-backlog-card" });
+    const bgHd = backlogCard.createDiv({ cls: "ts-card-head" });
+    bgHd.createSpan({ cls: "ts-card-label", text: "PROJECT POOL" });
+    bgHd.createSpan({ cls: "ts-card-meta", text: `${projectBacklog.length} items` });
+    this.renderProjectBacklog(backlogCard, projectBacklog);
+  }
 
-    // RIGHT: quick actions (高频操作前置)
-    const actCard = right.createDiv({ cls: "ts-card" });
-    actCard.createDiv({ cls: "ts-card-label", text: "QUICK" });
-    this.renderActions(actCard);
+  private renderProjectsPage(
+    board: HTMLElement,
+    activity: DailyActivity[],
+    projectActivity: ProjectActivity[],
+    gitActivity: GitActivitySummary,
+    wsStats: WorkspaceStats[],
+    recent: ReturnType<typeof getRecentFiles>,
+    products: ReturnType<typeof parseProducts>,
+    discovery: ProjectDiscoverySummary,
+    onboarding: ProjectOnboardingItem[],
+    materials: ProjectMaterialsItem[],
+  ) {
+    const activityCol = board.createDiv({ cls: "ts-board-col ts-activity-col" });
+    const heatSec  = activityCol.createDiv({ cls: "ts-card ts-compact-card ts-heatmap-card" });
+    if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; }
+    this.renderActivityDashboard(heatSec, activity, projectActivity, gitActivity);
 
-    // RIGHT: recent
-    if (recent.length > 0) {
-      const recCard = right.createDiv({ cls: "ts-card" });
-      recCard.createDiv({ cls: "ts-card-label", text: "RECENT" });
-      this.renderRecent(recCard, recent);
-    }
+    const workspaceCol = board.createDiv({ cls: "ts-board-col ts-workspace-col" });
+    const wsCard = workspaceCol.createDiv({ cls: "ts-card ts-compact-card ts-workspaces-card" });
+    wsCard.createDiv({ cls: "ts-card-label", text: "WORKSPACES" });
+    this.renderWorkspaces(wsCard, wsStats);
 
-    // RIGHT: products
-    if (products.length > 0) {
-      const prodCard = right.createDiv({ cls: "ts-card" });
-      prodCard.createDiv({ cls: "ts-card-label", text: "PRODUCTS" });
-      this.renderProducts(prodCard, products);
+    const recentCol = board.createDiv({ cls: "ts-board-col ts-recent-col" });
+    const recCard = recentCol.createDiv({ cls: "ts-card ts-compact-card ts-recent-card" });
+    recCard.createDiv({ cls: "ts-card-label", text: "RECENT" });
+    this.renderRecent(recCard, recent);
+
+    const materialsCol = board.createDiv({ cls: "ts-board-col ts-materials-col" });
+    const materialsCard = materialsCol.createDiv({ cls: "ts-card ts-compact-card ts-materials-card" });
+    materialsCard.createDiv({ cls: "ts-card-label", text: "MATERIALS" });
+    this.renderProjectMaterialsCard(materialsCard, materials);
+
+    const productsCol = board.createDiv({ cls: "ts-board-col ts-products-col" });
+    const prodCard = productsCol.createDiv({ cls: "ts-card ts-compact-card ts-products-card" });
+    prodCard.createDiv({ cls: "ts-card-label", text: "PRODUCTS" });
+    this.renderProducts(prodCard, products, discovery, onboarding);
+  }
+
+  private renderPageSwitch(parent: HTMLElement) {
+    const switcher = parent.createDiv({ cls: "ts-page-switch" });
+    const pages: Array<{ id: DashboardPage; label: string; icon: string }> = [
+      { id: "today", label: "今日工作", icon: "calendar-check" },
+      { id: "projects", label: "项目系统", icon: "folder-kanban" },
+    ];
+    for (const page of pages) {
+      const btn = switcher.createEl("button", {
+        cls: `ts-page-btn ${this.activePage === page.id ? "is-active" : ""}`,
+        attr: { "aria-label": page.label, title: page.label },
+      });
+      const icon = btn.createSpan({ cls: "ts-page-icon" });
+      setIcon(icon, page.icon);
+      btn.createSpan({ cls: "ts-page-label", text: page.label });
+      btn.addEventListener("click", async () => {
+        if (this.activePage === page.id) return;
+        this.activePage = page.id;
+        await this.render();
+      });
     }
   }
 
   // ── Stats row
   private renderStatsRow(parent: HTMLElement, s: VaultStats, activeDays: number) {
     const row = parent.createDiv({ cls: "ts-stats-row" });
-    for (const st of [
-      { value: s.total, label: "files" }, { value: s.thisWeek, label: "this week" },
-      { value: s.thisMonth, label: "this month" }, { value: activeDays, label: "active days" },
-    ]) {
-      const cell = row.createDiv({ cls: "ts-stat-cell" });
-      cell.createDiv({ cls: "ts-stat-num", text: String(st.value) });
-      cell.createDiv({ cls: "ts-stat-lbl", text: st.label });
+    const stats = [
+      { value: s.total, label: "files", icon: "files" },
+      { value: s.thisWeek, label: "this week", icon: "calendar-days" },
+      { value: s.thisMonth, label: "this month", icon: "calendar-range" },
+      { value: activeDays, label: "active days", icon: "activity" },
+    ];
+    stats.forEach((st, idx) => {
+      const cell = row.createDiv({ cls: "ts-stat-cell", attr: { style: `--ts-i:${idx}` } });
+      const icon = cell.createDiv({ cls: "ts-stat-icon" });
+      setIcon(icon, st.icon);
+      const copy = cell.createDiv({ cls: "ts-stat-copy" });
+      copy.createDiv({ cls: "ts-stat-num", text: String(st.value) });
+      copy.createDiv({ cls: "ts-stat-lbl", text: st.label });
+    });
+  }
+
+  // ── Activity: quiet 90-day dashboard, all three signals visible
+  private renderActivityDashboard(
+    parent: HTMLElement,
+    activity: DailyActivity[],
+    projects: ProjectActivity[],
+    git: GitActivitySummary,
+  ) {
+    const recent90 = this.fillRecentDays(activity, 90);
+    const recent7 = recent90.slice(-7);
+    const activeDays90 = recent90.filter(d => d.count > 0).length;
+    const weekCount = recent7.reduce((sum, d) => sum + d.count, 0);
+    const todayCount = recent90[recent90.length - 1]?.count ?? 0;
+    const streak = this.calcStreak(activity);
+    const topProject = projects.find(p => p.lifecycle !== "archived" && p.recentCount > 0) ?? projects.find(p => p.recentCount > 0);
+
+    const head = parent.createDiv({ cls: "ts-card-head ts-activity-head" });
+    const title = head.createDiv({ cls: "ts-activity-title" });
+    title.createSpan({ cls: "ts-card-label", text: "ACTIVITY" });
+    title.createSpan({
+      cls: "ts-card-meta",
+      text: `90d · ${activeDays90} active · week ${weekCount}${streak > 0 ? ` · ${streak}d streak` : ""}`,
+    });
+
+    const headMeta = head.createDiv({ cls: "ts-activity-head-metrics" });
+    this.renderActivityMetric(headMeta, "Today", todayCount, "files");
+    this.renderActivityMetric(headMeta, "Top", topProject?.name ?? "—", topProject ? `${topProject.recentCount} files` : "no project");
+
+    const body = parent.createDiv({ cls: "ts-activity-body" });
+    const vaultPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--vault" });
+    vaultPanel.createDiv({ cls: "ts-activity-panel-title", text: "全库 90 天" });
+    this.renderNinetyDayCalendar(vaultPanel, recent90);
+
+    const projectPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--projects" });
+    projectPanel.createDiv({ cls: "ts-activity-panel-title", text: `项目活跃 · ${projects.length}` });
+    this.renderProjectActivity(projectPanel, projects);
+
+    const gitPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--git" });
+    gitPanel.createDiv({ cls: "ts-activity-panel-title", text: "Git 提交" });
+    this.renderGitActivity(gitPanel, git);
+  }
+
+  private renderActivityMetric(parent: HTMLElement, label: string, value: string | number, sub: string) {
+    const item = parent.createDiv({ cls: "ts-activity-metric" });
+    item.createDiv({ cls: "ts-activity-metric-value", text: String(value) });
+    const row = item.createDiv({ cls: "ts-activity-metric-row" });
+    row.createSpan({ cls: "ts-activity-metric-label", text: label });
+    row.createSpan({ cls: "ts-activity-metric-sub", text: sub });
+  }
+
+  private renderNinetyDayCalendar(parent: HTMLElement, days: DailyActivity[]) {
+    const wrap = parent.createDiv({ cls: "ts-activity-calendar-wrap" });
+    const months = wrap.createDiv({ cls: "ts-activity-months" });
+    const monthLabels = this.calendarMonthLabels(days);
+    for (const item of monthLabels) {
+      months.createSpan({ cls: "ts-activity-month", text: item.label, attr: { style: `grid-column:${item.start} / ${item.end}` } });
     }
+
+    const grid = wrap.createDiv({ cls: "ts-activity-calendar" });
+    const max = Math.max(...days.map(d => d.count), 1);
+    days.forEach((day, idx) => {
+      const level = this.activityLevel(day.count, max);
+      const cell = grid.createDiv({ cls: `ts-day-cell ts-day-cell--${level}`, attr: { style: `--ts-i:${idx}` } });
+      cell.setAttr("title", `${day.date}: ${day.count}`);
+      cell.setAttr("aria-label", `${day.date}: ${day.count}`);
+    });
+
+    const trend = parent.createDiv({ cls: "ts-activity-week-trend" });
+    days.slice(-14).forEach((day, idx) => {
+      const bar = trend.createDiv({ cls: "ts-trend-bar" });
+      const pct = max > 0 ? Math.max(6, Math.round(day.count / max * 100)) : 6;
+      bar.createDiv({ cls: "ts-trend-fill", attr: { style: `height:${pct}%;--ts-i:${idx}` } });
+      bar.setAttr("title", `${day.date}: ${day.count}`);
+    });
+  }
+
+  private renderProjectActivity(parent: HTMLElement, projects: ProjectActivity[]) {
+    const list = parent.createDiv({ cls: "ts-project-activity-list" });
+    const visible = projects;
+    const max = Math.max(...visible.map(p => p.recentCount), 1);
+    if (visible.length === 0) {
+      list.createDiv({ cls: "ts-empty", text: "No project activity" });
+      return;
+    }
+    visible.forEach((project, idx) => {
+      const row = list.createDiv({
+        cls: `ts-project-activity-row${project.lifecycle === "archived" ? " is-archived" : ""}`,
+        attr: { style: `--ts-i:${idx}` },
+      });
+      const copy = row.createDiv({ cls: "ts-project-activity-copy" });
+      copy.createDiv({ cls: "ts-project-activity-name", text: project.name });
+      copy.createDiv({ cls: "ts-project-activity-meta", text: `${project.recentCount} files · ${project.lastModified ? this.relTime(project.lastModified) : "—"}` });
+      const bar = row.createDiv({ cls: "ts-project-activity-bar" });
+      bar.createDiv({ cls: "ts-project-activity-fill", attr: { style: `width:${Math.round(project.recentCount / max * 100)}%;--ts-i:${idx}` } });
+    });
+  }
+
+  private renderGitActivity(parent: HTMLElement, git: GitActivitySummary) {
+    const chart = parent.createDiv({ cls: "ts-git-trend" });
+    const max = Math.max(...git.days.map(d => d.count), 1);
+    git.days.forEach((day, idx) => {
+      const bar = chart.createDiv({ cls: "ts-git-day" });
+      const pct = day.count > 0 ? Math.max(8, Math.round(day.count / max * 100)) : 0;
+      bar.createDiv({ cls: "ts-git-fill", attr: { style: `height:${pct}%;--ts-i:${idx}` } });
+      bar.setAttr("title", `${day.date}: ${day.count} commits`);
+    });
+
+    const repos = parent.createDiv({ cls: "ts-git-repo-list" });
+    const visible = git.repos.slice(0, 3);
+    const repoMax = Math.max(...visible.map(r => r.count), 1);
+    if (visible.length === 0) {
+      repos.createDiv({ cls: "ts-empty", text: "No Git activity" });
+      return;
+    }
+    visible.forEach((repo, idx) => {
+      const row = repos.createDiv({ cls: "ts-git-repo-row", attr: { style: `--ts-i:${idx}` } });
+      row.createSpan({ cls: "ts-git-repo-name", text: repo.name });
+      row.createSpan({ cls: "ts-git-repo-count", text: `${repo.count}` });
+      row.createDiv({ cls: "ts-git-repo-bar" }).createDiv({
+        cls: "ts-git-repo-fill",
+        attr: { style: `width:${Math.round(repo.count / repoMax * 100)}%;--ts-i:${idx}` },
+      });
+    });
+  }
+
+  private fillRecentDays(activity: DailyActivity[], days: number): DailyActivity[] {
+    const map = new Map(activity.map(d => [d.date, d.count]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(today.getDate() - (days - 1));
+    const result: DailyActivity[] = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const date = localDateStr(d);
+      result.push({ date, count: map.get(date) ?? 0 });
+    }
+    return result;
+  }
+
+  private activityLevel(count: number, max: number): number {
+    if (count <= 0) return 0;
+    const pct = count / Math.max(max, 1);
+    if (pct <= .25) return 1;
+    if (pct <= .5) return 2;
+    if (pct <= .75) return 3;
+    return 4;
+  }
+
+  private calendarMonthLabels(days: DailyActivity[]): Array<{ label: string; start: number; end: number }> {
+    const labels: Array<{ label: string; start: number; end: number }> = [];
+    let current = "";
+    let start = 1;
+    for (let i = 0; i < days.length; i++) {
+      const [, month] = days[i].date.split("-");
+      if (!current) {
+        current = month;
+        start = Math.floor(i / 7) + 1;
+        continue;
+      }
+      if (month !== current) {
+        labels.push({ label: `${Number(current)}月`, start, end: Math.floor(i / 7) + 1 });
+        current = month;
+        start = Math.floor(i / 7) + 1;
+      }
+    }
+    if (current) labels.push({ label: `${Number(current)}月`, start, end: Math.floor((days.length - 1) / 7) + 2 });
+    return labels;
   }
 
   // ── Workspaces
@@ -189,6 +476,35 @@ export class DashboardView extends ItemView {
     }
   }
 
+  // ── Project backlog (from per-project 未完成事项.md)
+  private renderProjectBacklog(parent: HTMLElement, items: ProjectBacklogItem[]) {
+    if (items.length === 0) {
+      parent.createDiv({ cls: "ts-empty", text: "No project backlog" });
+      return;
+    }
+    const list = parent.createDiv({ cls: "ts-backlog-list" });
+    for (const item of items) this.renderProjectBacklogRow(list, item);
+  }
+
+  private renderProjectBacklogRow(parent: HTMLElement, item: ProjectBacklogItem) {
+    const row = parent.createDiv({ cls: "ts-backlog-row" });
+    const info = row.createDiv({ cls: "ts-backlog-info" });
+    info.createDiv({ cls: "ts-backlog-project", text: item.project });
+    info.createDiv({ cls: "ts-backlog-text", text: item.text });
+    const actions = row.createDiv({ cls: "ts-backlog-actions" });
+    const today = actions.createEl("button", { cls: "ts-backlog-btn ts-backlog-btn--primary", text: "今日" });
+    today.addEventListener("click", async () => {
+      today.disabled = true;
+      today.setText("加入中");
+      await promoteProjectBacklogItemToToday(this.app, item);
+      new Notice(`${item.project} 已加入今日 Todo`);
+      await this.refreshTodoSection();
+      await this.render();
+    });
+    const open = actions.createEl("button", { cls: "ts-backlog-btn", text: "打开" });
+    open.addEventListener("click", () => this.openFile(item.path));
+  }
+
   // ── Todos (from today's worklog ## 今日Todo)
   private renderTodos(parent: HTMLElement, items: TodoItem[]) {
     const pending = items.filter(t => !t.done);
@@ -199,20 +515,16 @@ export class DashboardView extends ItemView {
       return;
     }
     const list = parent.createDiv({ cls: "ts-todo-list" });
-    const SHOW = 8;
-    for (const item of pending.slice(0, SHOW)) this.renderTodoRow(list, item);
-    if (pending.length > SHOW) {
-      const m = list.createDiv({ cls: "ts-todo-more" });
-      m.setText(`+${pending.length - SHOW} more`);
-      m.addEventListener("click", () => this.openFile(getTodayWorklogPath()));
-    }
-    if (done.length > 0)
-      list.createDiv({ cls: "ts-todo-done-hint", text: `✓ ${done.length} completed` });
+    for (const item of [...pending, ...done]) this.renderTodoRow(list, item);
   }
 
   private renderTodoRow(parent: HTMLElement, item: TodoItem) {
     const row = parent.createDiv({ cls: `ts-todo-row${item.done ? " ts-todo-done" : ""}` });
-    const chk = row.createEl("span", { cls: "ts-todo-chk", text: item.done ? "☑" : "☐" });
+    const chk = row.createEl("button", {
+      cls: "ts-todo-chk",
+      attr: { "aria-label": item.done ? "Mark todo incomplete" : "Mark todo complete" },
+    });
+    setIcon(chk, item.done ? "check-square" : "square");
     const txt = row.createSpan({ cls: "ts-todo-txt", text: item.text });
 
     // checkbox 单击 = 切换完成状态（原地更新，无全页刷新）
@@ -220,7 +532,8 @@ export class DashboardView extends ItemView {
       e.stopPropagation();
       // 乐观更新：先改 DOM，再写文件
       item.done = !item.done;
-      chk.setText(item.done ? "☑" : "☐");
+      chk.setAttr("aria-label", item.done ? "Mark todo incomplete" : "Mark todo complete");
+      setIcon(chk, item.done ? "check-square" : "square");
       if (item.done) row.addClass("ts-todo-done");
       else           row.removeClass("ts-todo-done");
       // 同步更新 header 上的 pending 计数
@@ -233,6 +546,10 @@ export class DashboardView extends ItemView {
         }
       }
       await toggleTodoInWorklog(this.app, item);
+      if (item.done) {
+        this.showTodoArchiveToast(item.text);
+        await this.refreshTodoSection();
+      }
     });
 
     // 单击行 = 打开文件（detail >= 2 时忽略，让 dblclick 接管）
@@ -284,59 +601,294 @@ export class DashboardView extends ItemView {
     });
   }
 
-  // ── Today: ## 今日重点 + ## 重点记录 时间线 ──────────────────
-  private renderTodayWorklog(parent: HTMLElement, today: TodayWorklog) {
-    const body = parent.createDiv({ cls: "ts-log-body" });
+  // ── Today: ## 今日重点 + ## 今日Todo + ## 重点记录 + event stream ──
+  private emptyTodayWorklog(): TodayWorklog {
+    return { highlights: [], todos: [], entries: [], outputs: [], events: [] };
+  }
 
-    // 今日重点：人工写的摘要
-    if (today.highlights.length > 0) {
-      const hl = body.createDiv({ cls: "ts-log-highlights" });
+  private renderTodayWorklog(parent: HTMLElement, today: TodayWorklog, missingLog = false) {
+    const body = parent.createDiv({ cls: "ts-log-body ts-log-body--split" });
+    const openToday = () => this.openTodayLog();
+
+    const focusCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--focus" });
+    focusCard.createDiv({ cls: "ts-today-subhead", text: "今日重点" });
+    const focusBody = focusCard.createDiv({ cls: "ts-today-scroll" });
+    if (missingLog) {
+      const init = focusBody.createEl("button", { cls: "ts-today-init" });
+      init.createSpan({ cls: "ts-today-init-title", text: "创建今天工作日志" });
+      init.createSpan({ cls: "ts-today-init-sub", text: getTodayWorklogPath() });
+      init.addEventListener("click", openToday);
+    } else if (today.highlights.length === 0) {
+      focusBody.createDiv({ cls: "ts-empty ts-today-empty", text: "No highlights" });
+    } else {
+      const hl = focusBody.createDiv({ cls: "ts-log-highlights" });
       for (const h of today.highlights) {
         const row = hl.createDiv({ cls: "ts-log-highlight-row" });
+        row.addEventListener("click", openToday);
         row.createSpan({ cls: "ts-log-hl-bullet", text: "◆" });
         row.createSpan({ cls: "ts-log-hl-text",   text: h });
       }
     }
 
-    // 重点记录：时间轴，只展示时间+标题
+    const todoCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--todo" });
+    todoCard.createDiv({ cls: "ts-today-subhead", text: "今日Todo" });
+    const todoBody = todoCard.createDiv({ cls: "ts-today-scroll" });
+    if (today.todos.length === 0) {
+      todoBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示 Todo" : "No todos" });
+    } else {
+      const todoWrap = todoBody.createDiv({ cls: "ts-log-section" });
+      const pendingTodos = today.todos.filter(t => !t.done);
+      const doneTodos = today.todos.filter(t => t.done);
+      for (const item of [...pendingTodos, ...doneTodos]) {
+        const row = todoWrap.createDiv({ cls: `ts-log-todo-row${item.done ? " ts-log-todo-done" : ""}` });
+        row.addEventListener("click", openToday);
+        row.createSpan({ cls: "ts-log-todo-box", text: item.done ? "☑" : "☐" });
+        row.createSpan({ cls: "ts-log-todo-text", text: item.text });
+      }
+    }
+
+    const flowCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--flow" });
+    flowCard.createDiv({ cls: "ts-today-subhead", text: "时间线 / 产出" });
+    const flowBody = flowCard.createDiv({ cls: "ts-today-scroll" });
+    let hasFlow = false;
+
+    // 重点记录：时间轴，展示标题和该条记录正文
     if (today.entries.length > 0) {
-      const tl = body.createDiv({ cls: "ts-log-timeline" });
+      hasFlow = true;
+      const section = flowBody.createDiv({ cls: "ts-log-section" });
+      const title = section.createDiv({ cls: "ts-log-subtitle", text: "TIMELINE" });
+      title.addEventListener("click", openToday);
+      const tl = section.createDiv({ cls: "ts-log-timeline" });
       for (const e of today.entries) {
         const row = tl.createDiv({ cls: "ts-log-tl-row" });
-        row.addEventListener("click", () => this.openFile(getTodayWorklogPath()));
-        row.createSpan({ cls: "ts-log-time",  text: e.time });
-        row.createSpan({ cls: "ts-log-tl-sep", text: "—" });
-        row.createSpan({ cls: "ts-log-tl-title", text: e.title });
+        row.addEventListener("click", openToday);
+        const head = row.createDiv({ cls: "ts-log-tl-head" });
+        head.createSpan({ cls: "ts-log-time",  text: e.time });
+        head.createSpan({ cls: "ts-log-tl-sep", text: "—" });
+        head.createSpan({ cls: "ts-log-tl-title", text: e.title });
+        if (e.body.length > 0) {
+          const detail = row.createDiv({ cls: "ts-log-tl-detail" });
+          for (const line of e.body) detail.createDiv({ cls: "ts-log-tl-line", text: line });
+        }
       }
+    }
+
+    // 今日产出：展示当天生成/更新的核心文档和索引
+    if (today.outputs.length > 0) {
+      hasFlow = true;
+      const outputs = flowBody.createDiv({ cls: "ts-log-section" });
+      outputs.createDiv({ cls: "ts-log-subtitle", text: "OUTPUTS" });
+      for (const output of today.outputs) {
+        const row = outputs.createDiv({ cls: "ts-log-output-row" });
+        row.addEventListener("click", openToday);
+        row.createSpan({ cls: "ts-log-output-mark", text: "→" });
+        row.createSpan({ cls: "ts-log-output-title", text: output.raw });
+      }
+    }
+
+    // Agent 产出 / Git 提交：实时流
+    if (today.events.length > 0) {
+      hasFlow = true;
+      const stream = flowBody.createDiv({ cls: "ts-log-section" });
+      stream.createDiv({ cls: "ts-log-subtitle", text: "LIVE" });
+      for (const event of today.events) {
+        const row = stream.createDiv({ cls: `ts-log-event-row ts-log-event--${event.kind}` });
+        row.addEventListener("click", openToday);
+        row.createSpan({ cls: "ts-log-event-kind", text: event.kind === "git" ? "git" : "agent" });
+        if (event.time) row.createSpan({ cls: "ts-log-event-time", text: event.time });
+        row.createSpan({ cls: "ts-log-event-title", text: event.title });
+      }
+    }
+
+    if (!hasFlow) {
+      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示记录/产出" : "No records" });
     }
   }
 
+  private renderInlineMore(parent: HTMLElement, count: number) {
+    if (count <= 0) return;
+    const more = parent.createDiv({ cls: "ts-inline-more", text: `+ ${count} more` });
+    more.addEventListener("click", () => this.openFile(getTodayWorklogPath()));
+  }
+
   // ── Products
-  private renderProducts(parent: HTMLElement, products: ReturnType<typeof parseProducts>) {
-    const ICONS: Record<string, string> = { active:"●", watch:"◐", paused:"○" };
-    const list = parent.createDiv({ cls: "ts-prod-list" });
-    for (const p of products) {
-      const row = list.createDiv({ cls: `ts-prod-row ts-prod--${p.status}` });
-      row.createSpan({ cls: "ts-prod-dot", text: ICONS[p.status]??"·" });
-      const info = row.createDiv({ cls: "ts-prod-info" });
-      info.createDiv({ cls: "ts-prod-name", text: p.name });
-      if (p.milestone) info.createDiv({ cls: "ts-prod-mile", text: p.milestone });
+  private renderProducts(
+    parent: HTMLElement,
+    products: ReturnType<typeof parseProducts>,
+    discovery: ProjectDiscoverySummary,
+    onboarding: ProjectOnboardingItem[],
+  ) {
+    const onboardingPending = onboarding.filter(item => item.needsOnboarding);
+    if (products.length === 0 && discovery.pending.length === 0 && onboardingPending.length === 0 && !discovery.error) {
+      parent.createDiv({ cls: "ts-empty", text: "No product status" });
+      return;
     }
+
+    const ICONS: Record<string, string> = { active:"●", watch:"◐", paused:"○" };
+    if (products.length > 0) {
+      const list = parent.createDiv({ cls: "ts-prod-list" });
+      const visible = products.slice(0, this.singleScreenLimit.products);
+      for (const p of visible) {
+        const row = list.createDiv({ cls: `ts-prod-row ts-prod--${p.status}` });
+        row.createSpan({ cls: "ts-prod-dot", text: ICONS[p.status]??"·" });
+        const info = row.createDiv({ cls: "ts-prod-info" });
+        info.createDiv({ cls: "ts-prod-name", text: p.name });
+        if (p.milestone) info.createDiv({ cls: "ts-prod-mile", text: p.milestone });
+      }
+      if (products.length > visible.length) list.createDiv({ cls: "ts-inline-more", text: `+ ${products.length - visible.length} more products` });
+    }
+
+    this.renderProjectDiscovery(parent, discovery, onboardingPending);
+  }
+
+  private renderProjectDiscovery(parent: HTMLElement, discovery: ProjectDiscoverySummary, onboarding: ProjectOnboardingItem[]) {
+    if (discovery.error) {
+      const warn = parent.createDiv({ cls: "ts-discovery-box ts-discovery-box--warn" });
+      warn.createDiv({ cls: "ts-discovery-kicker", text: "SYSTEM / INBOX" });
+      warn.createDiv({ cls: "ts-discovery-title", text: "项目发现扫描异常" });
+      warn.createDiv({ cls: "ts-discovery-path", text: discovery.error });
+      return;
+    }
+    if (discovery.pending.length > 0) {
+      const box = parent.createDiv({ cls: "ts-discovery-box" });
+      const head = box.createDiv({ cls: "ts-discovery-head" });
+      const copy = head.createDiv({ cls: "ts-discovery-copy" });
+      copy.createDiv({ cls: "ts-discovery-kicker", text: "SYSTEM / INBOX" });
+      copy.createDiv({ cls: "ts-discovery-title", text: `${discovery.pending.length} 个新项目待确认` });
+      const openBtn = head.createEl("button", { cls: "ts-discovery-open", text: "打开确认单" });
+      openBtn.addEventListener("click", () => this.openFile(discovery.notePath));
+
+      const list = box.createDiv({ cls: "ts-discovery-list" });
+      for (const candidate of discovery.pending.slice(0, 3)) this.renderCandidateRow(list, candidate);
+      if (discovery.pending.length > 3) {
+        const more = list.createDiv({ cls: "ts-inline-more", text: `+ ${discovery.pending.length - 3} more candidates` });
+        more.addEventListener("click", () => this.openFile(discovery.notePath));
+      }
+    }
+
+    if (onboarding.length > 0) this.renderProjectOnboarding(parent, onboarding);
+  }
+
+  private renderCandidateRow(parent: HTMLElement, candidate: ProjectCandidate) {
+    const row = parent.createDiv({ cls: "ts-discovery-row" });
+    const info = row.createDiv({ cls: "ts-discovery-info" });
+    info.createDiv({ cls: "ts-discovery-name", text: candidate.name });
+    info.createDiv({ cls: "ts-discovery-path", text: candidate.path });
+    info.createDiv({ cls: "ts-discovery-markers", text: candidate.markers.join(" · ") });
+
+    const actions = row.createDiv({ cls: "ts-discovery-actions" });
+    const accept = actions.createEl("button", { cls: "ts-discovery-btn ts-discovery-btn--primary", text: "纳入" });
+    accept.addEventListener("click", async () => {
+      const accepted = await acceptProjectCandidate(this.app, candidate.id);
+      new Notice(accepted ? `已纳入 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
+      await this.render();
+    });
+
+    const ignore = actions.createEl("button", { cls: "ts-discovery-btn", text: "忽略" });
+    ignore.addEventListener("click", async () => {
+      const ignored = await ignoreProjectCandidate(this.app, candidate.id);
+      new Notice(ignored ? `已忽略 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
+      await this.render();
+    });
+  }
+
+  private renderProjectOnboarding(parent: HTMLElement, onboarding: ProjectOnboardingItem[]) {
+    const box = parent.createDiv({ cls: "ts-discovery-box ts-discovery-box--onboarding" });
+    const head = box.createDiv({ cls: "ts-discovery-head" });
+    const copy = head.createDiv({ cls: "ts-discovery-copy" });
+    copy.createDiv({ cls: "ts-discovery-kicker", text: "PROJECT ONBOARDING" });
+    copy.createDiv({ cls: "ts-discovery-title", text: `${onboarding.length} 个项目待接入` });
+
+    const list = box.createDiv({ cls: "ts-discovery-list" });
+    for (const item of onboarding.slice(0, 4)) {
+      const row = list.createDiv({ cls: "ts-discovery-row" });
+      const info = row.createDiv({ cls: "ts-discovery-info" });
+      info.createDiv({ cls: "ts-discovery-name", text: item.name });
+      info.createDiv({ cls: "ts-discovery-path", text: item.repoPath });
+      info.createDiv({ cls: "ts-discovery-markers", text: item.reason });
+
+      const actions = row.createDiv({ cls: "ts-discovery-actions" });
+      const connect = actions.createEl("button", { cls: "ts-discovery-btn ts-discovery-btn--primary", text: "接入" });
+      connect.addEventListener("click", async () => {
+        connect.disabled = true;
+        connect.setText("接入中");
+        const result = await runProjectOnboarding(this.app, item.id);
+        if (result) {
+          new Notice(`${item.name} 接入完成：hook=${result.hookStatus}，history=${result.historyStatus}`);
+        } else {
+          new Notice(`未找到待接入项目：${item.name}`);
+        }
+        await this.render();
+      });
+    }
+    if (onboarding.length > 4) list.createDiv({ cls: "ts-inline-more", text: `+ ${onboarding.length - 4} more onboarding items` });
+  }
+
+  private renderProjectMaterialsCard(parent: HTMLElement, materials: ProjectMaterialsItem[]) {
+    if (materials.length === 0) {
+      parent.createDiv({ cls: "ts-empty", text: "No project materials" });
+      return;
+    }
+
+    const pending = materials.filter(item => item.needsImport);
+    const synced = materials.length - pending.length;
+    const summary = parent.createDiv({ cls: "ts-material-summary" });
+    summary.createDiv({ cls: `ts-material-pill ${pending.length > 0 ? "ts-material-pill--warn" : "ts-material-pill--ok"}`, text: `${synced}真实/${materials.length}总数 synced` });
+    summary.createDiv({ cls: "ts-material-pill", text: pending.length > 0 ? `${pending.length} pending` : "all current" });
+
+    const list = parent.createDiv({ cls: "ts-material-list" });
+    const visible = materials.slice(0, this.singleScreenLimit.materials);
+    for (const item of visible) this.renderProjectMaterialRow(list, item);
+    if (materials.length > visible.length) {
+      list.createDiv({ cls: "ts-inline-more", text: `+ ${materials.length - visible.length} more material projects` });
+    }
+  }
+
+  private renderProjectMaterialRow(parent: HTMLElement, item: ProjectMaterialsItem) {
+    const row = parent.createDiv({ cls: `ts-material-row ${item.needsImport ? "ts-material-row--pending" : "ts-material-row--synced"}` });
+    const info = row.createDiv({ cls: "ts-material-info" });
+    const top = info.createDiv({ cls: "ts-material-top" });
+    top.createSpan({ cls: "ts-material-name", text: item.name });
+    top.createSpan({ cls: "ts-material-count", text: `${item.importedCount}/${item.candidateCount}` });
+    info.createDiv({ cls: "ts-material-path", text: item.repoPath });
+    info.createDiv({ cls: "ts-material-reason", text: item.reason });
+
+    const actions = row.createDiv({ cls: "ts-material-actions" });
+    if (item.indexExists) {
+      const open = actions.createEl("button", { cls: "ts-material-btn", text: "打开" });
+      open.addEventListener("click", () => this.openFile(item.indexPath));
+    }
+    const importBtn = actions.createEl("button", {
+      cls: `ts-material-btn ${item.needsImport ? "ts-material-btn--primary" : ""}`,
+      text: item.needsImport ? (item.importedCount > 0 ? "更新" : "导入") : "重扫",
+    });
+    importBtn.addEventListener("click", async () => {
+      importBtn.disabled = true;
+      importBtn.setText(item.needsImport ? "处理中" : "重扫中");
+      const result = await runProjectMaterialsImport(this.app, item.id);
+      if (result) {
+        new Notice(`${item.name} 资料索引完成：${result.importedCount} files`);
+      } else {
+        new Notice(`未找到资料导入项目：${item.name}`);
+      }
+      await this.render();
+    });
   }
 
   // ── Quick actions
   private renderActions(parent: HTMLElement) {
     const ACTIONS = [
-      { label: "新笔记",  icon: "✎", fn: () => this.createNewNote() },
-      { label: "今日志",  icon: "◈", fn: () => this.openTodayLog() },
-      { label: "记TODO",  icon: "☐", fn: () => this.openTodoModal() },
-      { label: "搜索",    icon: "⊕", fn: () => this.runCmd("global-search:open") },
-      { label: "收件箱",  icon: "↓", fn: () => this.openWorkspace("01-收件箱") },
+      { label: "新笔记",  icon: "square-pen", fn: () => this.createNewNote() },
+      { label: "今日志",  icon: "calendar-clock", fn: () => this.openTodayLog() },
+      { label: "记TODO",  icon: "list-todo", fn: () => this.openTodoModal() },
+      { label: "搜索",    icon: "search", fn: () => this.runCmd("global-search:open") },
+      { label: "收件箱",  icon: "inbox", fn: () => this.openWorkspace("01-收件箱") },
     ];
     const grid = parent.createDiv({ cls: "ts-act-grid" });
     for (const a of ACTIONS) {
-      const btn = grid.createEl("button", { cls: "ts-act-btn" });
-      btn.createDiv({ cls: "ts-act-icon", text: a.icon });
+      const btn = grid.createEl("button", { cls: "ts-act-btn", attr: { title: a.label } });
+      const icon = btn.createDiv({ cls: "ts-act-icon" });
+      setIcon(icon, a.icon);
       btn.createDiv({ cls: "ts-act-label", text: a.label });
       btn.addEventListener("click", a.fn);
     }
@@ -344,14 +896,23 @@ export class DashboardView extends ItemView {
 
   // ── Recent
   private renderRecent(parent: HTMLElement, files: ReturnType<typeof getRecentFiles>) {
+    if (files.length === 0) {
+      parent.createDiv({ cls: "ts-empty", text: "No recent files" });
+      return;
+    }
+
     const list = parent.createDiv({ cls: "ts-rec-list" });
-    for (const f of files) {
+    const visible = files.slice(0, this.singleScreenLimit.recent);
+    for (const f of visible) {
       const row = list.createDiv({ cls: "ts-rec-row" });
       row.addEventListener("click", () => this.openFile(f.path));
-      row.createSpan({ cls: "ts-rec-ws",   text: f.workspace.replace(/^\d+-/,"").slice(0,6) });
-      row.createSpan({ cls: "ts-rec-name", text: f.name });
+      row.createSpan({ cls: "ts-rec-ws",   text: f.workspace.replace(/^\d+-/,"") });
+      const copy = row.createDiv({ cls: "ts-rec-copy" });
+      copy.createDiv({ cls: "ts-rec-name", text: f.name });
+      copy.createDiv({ cls: "ts-rec-path", text: f.path });
       row.createSpan({ cls: "ts-rec-time", text: this.relTime(f.mtime) });
     }
+    if (files.length > visible.length) list.createDiv({ cls: "ts-inline-more", text: `+ ${files.length - visible.length} more recent files` });
   }
 
   // ── Helpers
@@ -370,6 +931,18 @@ export class DashboardView extends ItemView {
   private async openFile(path: string) {
     const f = this.app.vault.getAbstractFileByPath(path) as TFile|null;
     if (f) await this.app.workspace.getLeaf(false).openFile(f);
+  }
+  private showTodoArchiveToast(text: string) {
+    const existing = this.contentEl.querySelector<HTMLElement>(".ts-flow-toast");
+    if (existing) existing.remove();
+
+    const toast = this.contentEl.createDiv({ cls: "ts-flow-toast" });
+    toast.createSpan({ cls: "ts-flow-dot", text: "" });
+    const copy = toast.createDiv({ cls: "ts-flow-copy" });
+    copy.createDiv({ cls: "ts-flow-title", text: "已归档到今日产出" });
+    copy.createDiv({ cls: "ts-flow-text", text });
+    window.setTimeout(() => toast.addClass("is-leaving"), 1200);
+    window.setTimeout(() => toast.remove(), 1800);
   }
   private openWorkspace(dir: string) {
     const fe = (this.app as any).internalPlugins?.plugins?.["file-explorer"]?.instance;
@@ -390,16 +963,8 @@ export class DashboardView extends ItemView {
     catch { const f = this.app.vault.getAbstractFileByPath(path) as TFile|null; if (f) await this.app.workspace.getLeaf(false).openFile(f); }
   }
   private async openTodayLog() {
-    const today = new Date();
-    const ymd   = localDateCompact(today);
-    const wd    = ["日","一","二","三","四","五","六"][today.getDay()];
-    const path  = `02-日记/工作日志/${ymd}_工作日志_周${wd}.md`;
-    const f = this.app.vault.getAbstractFileByPath(path) as TFile|null;
-    if (f) { await this.app.workspace.getLeaf(false).openFile(f); return; }
-    const all = this.app.vault.getMarkdownFiles();
-    const log = all.find(f => f.path.startsWith("02-日记/工作日志/") && f.basename.startsWith(ymd));
-    if (log) await this.app.workspace.getLeaf(false).openFile(log);
-    else this.openWorkspace("02-日记");
+    const f = await ensureTodayWorklog(this.app);
+    await this.app.workspace.getLeaf(false).openFile(f);
   }
   private openTodoModal() {
     new TodoModal(this.app, async (text) => {
@@ -426,6 +991,55 @@ export class DashboardView extends ItemView {
     this.renderTodos(todoCard, todos);
   }
   private runCmd(id: string) { try { (this.app as any).commands.executeCommandById(id); } catch {} }
+
+  private async archiveStaleTodosFromOldWorklogs() {
+    if (this.archivingStaleTodos) return;
+    this.archivingStaleTodos = true;
+    try {
+      await archiveStaleTodosToProjectBacklog(this.app);
+    } finally {
+      this.archivingStaleTodos = false;
+    }
+  }
+
+  private registerLiveRefresh() {
+    const onVaultChange = async (file: TAbstractFile) => {
+      if (!this.shouldRefreshForPath(file.path)) return;
+      if (file.path === getTodayWorklogPath()) await this.archiveCompletedTodosFromToday();
+      this.scheduleLiveRender();
+    };
+    this.registerEvent(this.app.vault.on("modify", onVaultChange));
+    this.registerEvent(this.app.vault.on("create", onVaultChange));
+    this.registerEvent(this.app.vault.on("delete", onVaultChange));
+  }
+
+  private shouldRefreshForPath(path: string): boolean {
+    if (path.startsWith(".thirdspace/")) return true;
+    if (!path.endsWith(".md")) return false;
+    if (path === getTodayWorklogPath()) return true;
+    if (path.startsWith("02-日记/工作日志/")) return true;
+    if (/^(0[0-6]|99)-/.test(path)) return true;
+    return false;
+  }
+
+  private scheduleLiveRender() {
+    if (this.liveRenderTimer) clearTimeout(this.liveRenderTimer);
+    this.liveRenderTimer = window.setTimeout(async () => {
+      this.liveRenderTimer = null;
+      if (!this.containerEl.isConnected) return;
+      await this.render();
+    }, 300);
+  }
+
+  private async archiveCompletedTodosFromToday() {
+    if (this.archivingCompletedTodos) return;
+    this.archivingCompletedTodos = true;
+    try {
+      await archiveCompletedTodosInWorklog(this.app);
+    } finally {
+      this.archivingCompletedTodos = false;
+    }
+  }
 
   /** 蛇跑完後等 2 秒自動重播，不依賴 60s 全量刷新 */
   private scheduleSnakeReplay(container: HTMLElement, cells: SnakeCell[], durationMs: number) {

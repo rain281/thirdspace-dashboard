@@ -23,6 +23,7 @@ export type DrawOptions = {
   sizeCell: number;
   sizeDot: number;
   sizeDotBorderRadius: number;
+  showStack?: boolean;
   dark?: {
     colorDots: Record<Color, string>;
     colorEmpty: string;
@@ -75,7 +76,8 @@ export const createSvg = (
   animationOptions: { stepDurationMs: number },
 ) => {
   const width = (grid.width + 2) * drawOptions.sizeCell;
-  const height = (grid.height + 5) * drawOptions.sizeCell;
+  const stackRows = drawOptions.showStack === false ? 3 : 5;
+  const height = (grid.height + stackRows) * drawOptions.sizeCell;
 
   const duration = animationOptions.stepDurationMs * chain.length;
 
@@ -83,13 +85,15 @@ export const createSvg = (
 
   const elements = [
     createGrid(livingCells, drawOptions, duration),
-    createStack(
-      livingCells,
-      drawOptions,
-      grid.width * drawOptions.sizeCell,
-      (grid.height + 2) * drawOptions.sizeCell,
-      duration,
-    ),
+    ...(drawOptions.showStack === false
+      ? []
+      : [createStack(
+          livingCells,
+          drawOptions,
+          grid.width * drawOptions.sizeCell,
+          (grid.height + 2) * drawOptions.sizeCell,
+          duration,
+        )]),
     createSnake(chain, drawOptions, duration),
   ];
 
