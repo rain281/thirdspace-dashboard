@@ -82,7 +82,6 @@ export class DashboardView extends ItemView {
     entries: 2,
     outputs: 6,
     events: 4,
-    recent: 3,
     products: 5,
     materials: 5,
   };
@@ -904,8 +903,7 @@ export class DashboardView extends ItemView {
     }
 
     const list = parent.createDiv({ cls: "ts-rec-list" });
-    const visible = files.slice(0, this.singleScreenLimit.recent);
-    for (const f of visible) {
+    for (const f of files) {
       const row = list.createDiv({ cls: "ts-rec-row" });
       row.addEventListener("click", () => this.openFile(f.path));
       row.createSpan({ cls: "ts-rec-ws",   text: f.workspace.replace(/^\d+-/,"") });
@@ -914,7 +912,6 @@ export class DashboardView extends ItemView {
       copy.createDiv({ cls: "ts-rec-path", text: f.path });
       row.createSpan({ cls: "ts-rec-time", text: this.relTime(f.mtime) });
     }
-    if (files.length > visible.length) list.createDiv({ cls: "ts-inline-more", text: `+ ${files.length - visible.length} more recent files` });
   }
 
   // ── Helpers
