@@ -17,12 +17,14 @@ function parseFmDate(s: unknown): number {
   if (!s || typeof s !== "string") return 0;
   try { return new Date(s.replace(" ", "T")).getTime() || 0; } catch { return 0; }
 }
-function fileCreated(app: App, f: TFile): number {
-  const fm = app.metadataCache.getFileCache(f)?.frontmatter;
+function fileCreated(app: App, f: MarkdownFileRef): number {
+  const indexed = app.vault.getAbstractFileByPath(f.path) as TFile | null;
+  const fm = indexed ? app.metadataCache.getFileCache(indexed)?.frontmatter : undefined;
   return parseFmDate(fm?.created) || f.stat.ctime || f.stat.mtime;
 }
-function fileModified(app: App, f: TFile): number {
-  const fm = app.metadataCache.getFileCache(f)?.frontmatter;
+function fileModified(app: App, f: MarkdownFileRef): number {
+  const indexed = app.vault.getAbstractFileByPath(f.path) as TFile | null;
+  const fm = indexed ? app.metadataCache.getFileCache(indexed)?.frontmatter : undefined;
   return parseFmDate(fm?.modified) || f.stat.mtime;
 }
 
@@ -46,6 +48,7 @@ export interface GitRepoActivity { id: string; name: string; branch: string; cou
 export interface GitActivitySummary { days: DailyActivity[]; repos: GitRepoActivity[]; total: number; }
 export interface TodoItem        { text: string; done: boolean; }
 export interface VaultStats      { total: number; thisWeek: number; thisMonth: number; activeDays: number; }
+export interface RecentFile      { path: string; name: string; workspace: string; mtime: number; }
 export interface WorklogEntry    { time: string; title: string; body: string[]; }
 export interface WorklogEvent    { kind: "agent" | "git"; time: string; title: string; }
 export interface WorklogOutput   { title: string; raw: string; }
@@ -58,17 +61,72 @@ const FALLBACK_UNFINISHED_PATH = "01-收件箱/待整理/项目未完成事项.m
 const FALLBACK_COMPLETED_PATH = "01-收件箱/待整理/项目完成事项.md";
 const TASK_ARCHIVE_START_COMPACT = "20260603";
 
+interface MarkdownFileRef {
+  path: string;
+  basename: string;
+  stat: {
+    ctime: number;
+    mtime: number;
+    size: number;
+  };
+}
+
 // ── Skip rules ───────────────────────────────────────────────
 // Use exact path-segment matching, not substring — prevents false positives
 // on notes whose names happen to contain "INDEX", "README", etc.
 const SKIP_DIRS  = new Set(["_legacy", ".thirdspace"]);
 const SKIP_NAMES = new Set(["WORKSPACE", "AGENTS", "CLAUDE", "README", "INDEX"]);
 
-function shouldSkip(f: TFile): boolean {
+function shouldSkip(f: MarkdownFileRef): boolean {
   const parts = f.path.split("/");
   if (parts.some(p => SKIP_DIRS.has(p))) return true;
   if (SKIP_NAMES.has(f.basename))         return true;
   return false;
+}
+
+async function listMarkdownFiles(app: App): Promise<MarkdownFileRef[]> {
+  const files: MarkdownFileRef[] = [];
+  const seen = new Set<string>();
+  await walkAdapterFolder(app, "", files, seen);
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+async function walkAdapterFolder(
+  app: App,
+  folder: string,
+  files: MarkdownFileRef[],
+  seen: Set<string>,
+): Promise<void> {
+  if (seen.has(folder)) return;
+  seen.add(folder);
+
+  const listing = await app.vault.adapter.list(folder).catch(() => null);
+  if (!listing) return;
+
+  for (const path of listing.files) {
+    if (!path.toLowerCase().endsWith(".md")) continue;
+    const stat = await app.vault.adapter.stat(path).catch(() => null);
+    if (!stat) continue;
+    files.push({
+      path,
+      basename: basenameFromPath(path),
+      stat: {
+        ctime: stat.ctime,
+        mtime: stat.mtime,
+        size: stat.size,
+      },
+    });
+  }
+
+  for (const child of listing.folders) {
+    const name = child.split("/").pop() ?? child;
+    if (name === ".git" || name === ".obsidian") continue;
+    await walkAdapterFolder(app, child, files, seen);
+  }
+}
+
+function basenameFromPath(path: string): string {
+  return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
 }
 
 // ── Constants ────────────────────────────────────────────────
@@ -203,7 +261,7 @@ function parseWorkspaceYaml(content: string): WorkspaceEntry[] {
 
 // ── Workspace stats ──────────────────────────────────────────
 export async function getWorkspaceStats(app: App, dirs: string[]): Promise<WorkspaceStats[]> {
-  const allFiles = app.vault.getMarkdownFiles();
+  const allFiles = await listMarkdownFiles(app);
   const targetDirs = dirs.length > 0 ? dirs : DEFAULT_WORKSPACES;
   return targetDirs.map(dir => {
     const files = allFiles.filter(f =>
@@ -219,7 +277,7 @@ export async function getWorkspaceStats(app: App, dirs: string[]): Promise<Works
 export async function getDailyActivity(app: App, days = 365): Promise<DailyActivity[]> {
   const cutoff = Date.now() - days * 86_400_000;
   const countMap: Record<string, number> = {};
-  for (const f of app.vault.getMarkdownFiles()) {
+  for (const f of await listMarkdownFiles(app)) {
     if (shouldSkip(f)) continue;
     const ts = fileCreated(app, f);
     if (ts < cutoff) continue;
@@ -231,9 +289,10 @@ export async function getDailyActivity(app: App, days = 365): Promise<DailyActiv
 
 export async function getProjectActivity(app: App, days = 90): Promise<ProjectActivity[]> {
   const projects = await loadProjectIndex(app);
+  const allFiles = await listMarkdownFiles(app);
   const cutoff = Date.now() - days * 86_400_000;
   return projects.map(project => {
-    const files = app.vault.getMarkdownFiles().filter(f =>
+    const files = allFiles.filter(f =>
       f.path.startsWith(project.workspace + "/") &&
       !shouldSkip(f)
     );
@@ -302,8 +361,8 @@ function startOfLocalDay(date: Date): Date {
   return d;
 }
 
-export function getVaultStats(app: App): VaultStats {
-  const files = app.vault.getMarkdownFiles().filter(f => !shouldSkip(f));
+export async function getVaultStats(app: App): Promise<VaultStats> {
+  const files = (await listMarkdownFiles(app)).filter(f => !shouldSkip(f));
   const now = Date.now();
   const weekAgo = now - 7 * 86_400_000, monthAgo = now - 30 * 86_400_000;
   const daySet = new Set<string>();
@@ -317,9 +376,9 @@ export function getVaultStats(app: App): VaultStats {
   return { total: files.length, thisWeek: week, thisMonth: month, activeDays: daySet.size };
 }
 
-export function getRecentFiles(app: App, days = 7) {
+export async function getRecentFiles(app: App, days = 7): Promise<RecentFile[]> {
   const cutoff = Date.now() - days * 86_400_000;
-  return app.vault.getMarkdownFiles()
+  return (await listMarkdownFiles(app))
     .filter(f => fileModified(app, f) > cutoff && !shouldSkip(f))
     .sort((a,b) => fileModified(app, b) - fileModified(app, a))
     .map(f => ({ path: f.path, name: f.basename, workspace: f.path.split("/")[0]??"", mtime: fileModified(app, f) }));

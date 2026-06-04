@@ -11,7 +11,7 @@ import {
   loadProjectBacklog, promoteProjectBacklogItemToToday,
   type WorkspaceStats, type TodoItem, type VaultStats, type TodayWorklog,
   type DailyActivity, type ProjectActivity, type GitActivitySummary,
-  type ProjectBacklogItem,
+  type ProjectBacklogItem, type RecentFile,
 } from "./data/vault-reader";
 import {
   PROJECT_DISCOVERY_INBOX_PATH,
@@ -129,9 +129,11 @@ export class DashboardView extends ItemView {
     ]);
 
     const wsDirs    = wsIndex?.map(e => e.dir) ?? [];
-    const wsStats   = await getWorkspaceStats(this.app, wsDirs);
-    const vaultStats = getVaultStats(this.app);
-    const recent    = getRecentFiles(this.app, 7);
+    const [wsStats, vaultStats, recent] = await Promise.all([
+      getWorkspaceStats(this.app, wsDirs),
+      getVaultStats(this.app),
+      getRecentFiles(this.app, 7),
+    ]);
     const products  = productMd ? parseProducts(productMd) : [];
     const pending   = todos.filter(t => !t.done);
 
@@ -216,7 +218,7 @@ export class DashboardView extends ItemView {
     projectActivity: ProjectActivity[],
     gitActivity: GitActivitySummary,
     wsStats: WorkspaceStats[],
-    recent: ReturnType<typeof getRecentFiles>,
+    recent: RecentFile[],
     products: ReturnType<typeof parseProducts>,
     discovery: ProjectDiscoverySummary,
     onboarding: ProjectOnboardingItem[],
@@ -895,7 +897,7 @@ export class DashboardView extends ItemView {
   }
 
   // ── Recent
-  private renderRecent(parent: HTMLElement, files: ReturnType<typeof getRecentFiles>) {
+  private renderRecent(parent: HTMLElement, files: RecentFile[]) {
     if (files.length === 0) {
       parent.createDiv({ cls: "ts-empty", text: "No recent files" });
       return;
