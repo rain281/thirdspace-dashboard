@@ -425,5 +425,7 @@ function hasOpenRisk(text: string): boolean {
 }
 
 function hasBlockingText(text: string): boolean {
-  return /阻塞|blocked|卡住|等待/.test(text) && !/已解决|已解除|✅/.test(text);
+  return text
+    .split("\n")
+    .some(line => /阻塞|blocked|卡住|等待/.test(line) && !/已解决|已解除|✅/.test(line));
 }

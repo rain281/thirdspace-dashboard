@@ -227,3 +227,54 @@ const blockedDecisionProject = deriveManagedProjects({
 
 assert.equal(blockedDecisionProject.health.status, "风险");
 assert.ok(blockedDecisionProject.health.reasons.includes("存在待决策"));
+
+const resolvedBlockingDecisionMarkdown = standardMarkdown
+  .replace('project: "kora"', 'project: "resolved-decision"')
+  .replace('priority: "P0"', 'priority: "P1"')
+  .replace("## 风险与阻塞\n- [ ] 状态模板尚未统一", "## 风险与阻塞\n")
+  .replace("## 待决策\n- [ ] Portfolio 首屏密度", "## 待决策\n- [x] 已解决阻塞：旧问题 ✅");
+const resolvedDecisionProject = deriveManagedProjects({
+  projects: [
+    {
+      id: "resolved-decision",
+      name: "Resolved Decision",
+      lifecycle: "active",
+      workspace: "04-项目/产品系统/Resolved Decision",
+      status_note: "04-项目/产品系统/Resolved Decision/项目状态.md",
+    },
+  ],
+  statuses: new Map([
+    ["resolved-decision", parseProjectStatusMarkdown(resolvedBlockingDecisionMarkdown, "resolved-decision.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+})[0];
+
+assert.equal(resolvedDecisionProject.health.status, "注意");
+
+const mixedResolvedAndPendingDecisionMarkdown = standardMarkdown
+  .replace('project: "kora"', 'project: "mixed-decision"')
+  .replace('priority: "P0"', 'priority: "P1"')
+  .replace("## 风险与阻塞\n- [ ] 状态模板尚未统一", "## 风险与阻塞\n")
+  .replace(
+    "## 待决策\n- [ ] Portfolio 首屏密度",
+    "## 待决策\n- [x] 已解决阻塞：旧问题 ✅\n- [ ] 等待确认发布门禁",
+  );
+const mixedDecisionProject = deriveManagedProjects({
+  projects: [
+    {
+      id: "mixed-decision",
+      name: "Mixed Decision",
+      lifecycle: "active",
+      workspace: "04-项目/产品系统/Mixed Decision",
+      status_note: "04-项目/产品系统/Mixed Decision/项目状态.md",
+    },
+  ],
+  statuses: new Map([
+    ["mixed-decision", parseProjectStatusMarkdown(mixedResolvedAndPendingDecisionMarkdown, "mixed-decision.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+})[0];
+
+assert.equal(mixedDecisionProject.health.status, "风险");
