@@ -753,7 +753,7 @@ export class DashboardView extends ItemView {
     if (missingLog) {
       focus.createDiv({ cls: "ts-today-focus-text", text: "创建今日日志后显示指标" });
     } else if (metrics.blocked > 0) {
-      focus.createDiv({ cls: "ts-today-focus-text", text: `${metrics.blocked} 个条目包含 blocked / 阻塞 / 等待 / 卡住` });
+      focus.createDiv({ cls: "ts-today-focus-text", text: `${metrics.blocked} 个活跃阻塞` });
     } else if (metrics.focus) {
       focus.createDiv({ cls: "ts-today-focus-text", text: metrics.focus.text });
     } else {
@@ -799,7 +799,7 @@ export class DashboardView extends ItemView {
         tone: "warn",
         badge: "阻塞",
         title: blocked[0],
-        reason: `${blocked.length} 个条目包含 blocked / 阻塞 / 等待 / 卡住`,
+        reason: `${blocked.length} 个活跃阻塞`,
         button: "打开",
         target: "today",
         risks,
@@ -860,7 +860,7 @@ export class DashboardView extends ItemView {
       ...today.todos.map(todo => todo.text),
       ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw, ...item.body]),
     ];
-    return values.filter(text => this.isBlockedText(text));
+    return values.filter(text => this.isActiveBlockedText(text));
   }
 
   private todayHasOutput(today: TodayWorklog): boolean {
@@ -908,8 +908,18 @@ export class DashboardView extends ItemView {
     return this.blockedTextsFromToday(today).length;
   }
 
+  private isActiveBlockedText(text: string): boolean {
+    return this.isBlockedText(text) && !this.isResolvedBlockedText(text);
+  }
+
   private isBlockedText(text: string): boolean {
     return /\bblocked\b|阻塞|等待|卡住/i.test(text);
+  }
+
+  private isResolvedBlockedText(text: string): boolean {
+    if (/已解决|已解除|已处理|✅/i.test(text)) return true;
+    if (/未完成|没完成|没有完成|尚未完成/.test(text)) return false;
+    return /完成/.test(text);
   }
 
   private renderTimelineFilters(parent: HTMLElement, items: TimelineItem[]) {
