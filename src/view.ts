@@ -61,6 +61,11 @@ interface NextAction {
   risks: string[];
 }
 
+interface TimelineSummary {
+  summary: string;
+  chips: string[];
+}
+
 // ── Todo Input Modal ──────────────────────────────────────────
 class TodoModal extends Modal {
   private onSubmit: (text: string) => void;
@@ -960,20 +965,75 @@ export class DashboardView extends ItemView {
   }
 
   private renderTimelineItem(parent: HTMLElement, item: TimelineItem) {
+    const summary = this.timelineSummaryForItem(item);
     const row = parent.createDiv({ cls: `ts-timeline-row ts-timeline-row--${item.kind}` });
     row.addEventListener("click", () => this.openTimelineItem(item));
 
-    const meta = row.createDiv({ cls: "ts-timeline-meta" });
-    meta.createSpan({ cls: "ts-timeline-badge", text: item.badge });
-    meta.createSpan({ cls: "ts-timeline-time", text: item.time || "----" });
+    row.createDiv({ cls: "ts-timeline-rail" });
 
     const copy = row.createDiv({ cls: "ts-timeline-copy" });
+    const top = copy.createDiv({ cls: "ts-timeline-top" });
+    top.createSpan({ cls: "ts-timeline-badge", text: item.badge });
+    top.createSpan({ cls: "ts-timeline-time", text: item.time || "----" });
+
     copy.createDiv({ cls: "ts-timeline-title", text: item.title });
-    if (item.subtitle) copy.createDiv({ cls: "ts-timeline-subtitle", text: item.subtitle });
-    if (item.body.length > 0) {
-      const body = copy.createDiv({ cls: "ts-timeline-detail" });
-      for (const line of item.body.slice(0, 2)) body.createDiv({ cls: "ts-timeline-line", text: line });
+    if (summary.summary) copy.createDiv({ cls: "ts-timeline-summary", text: summary.summary });
+
+    if (summary.chips.length > 0) {
+      const chips = copy.createDiv({ cls: "ts-timeline-chips" });
+      for (const chip of summary.chips) chips.createSpan({ cls: "ts-timeline-chip", text: chip });
     }
+  }
+
+  private timelineSummaryForItem(item: TimelineItem): TimelineSummary {
+    return {
+      summary: this.timelineSummaryText(item),
+      chips: this.timelineChipsForItem(item).slice(0, 2),
+    };
+  }
+
+  private timelineSummaryText(item: TimelineItem): string {
+    const lines = [item.subtitle ?? "", ...item.body, item.raw]
+      .map(text => this.compactTimelineText(text))
+      .filter(Boolean);
+    const title = this.compactTimelineText(item.title);
+    return lines.find(text => text !== title) ?? "";
+  }
+
+  private timelineChipsForItem(item: TimelineItem): string[] {
+    const chips: string[] = [];
+    if (item.kind === "git" && item.subtitle) {
+      const parts = item.subtitle.split(" · ").map(part => part.trim()).filter(Boolean);
+      if (parts[0]) chips.push(parts[0]);
+      const filePart = parts.find(part => /\d+\s+files?|no file list/i.test(part));
+      if (filePart) chips.push(filePart.replace(" files", " 文件").replace("no file list", "无文件列表"));
+    }
+    if (item.kind === "agent") {
+      const verification = this.compactTimelineText(item.raw).match(/验证[：:][^。；;]+/)?.[0];
+      if (verification) chips.push(verification);
+    }
+    if (item.kind === "output" && item.badge) chips.push(item.badge);
+    if (item.targetPath) {
+      const pathChip = this.timelineChipFromPath(item.targetPath);
+      if (pathChip) chips.push(pathChip);
+    }
+    if (chips.length === 0 && item.kind === "record") chips.push("记录");
+    return Array.from(new Set(chips.filter(Boolean)));
+  }
+
+  private timelineChipFromPath(path: string): string {
+    const parts = path.split("/").filter(Boolean);
+    return parts.at(-1) ?? path;
+  }
+
+  private compactTimelineText(text: string): string {
+    return text
+      .replace(/`/g, "")
+      .replace(/^-+\s*/, "")
+      .replace(/\*\*/g, "")
+      .replace(/^(为什么做|怎么做的|改了什么)[：:]\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   private async openTimelineItem(item: TimelineItem) {

@@ -1815,42 +1815,73 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .ts-timeline-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 6px;
-  padding: 5px 6px;
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 7px;
+  padding: 6px 7px 6px 0;
   border: 1px solid color-mix(in srgb, var(--ts-border) 78%, transparent 22%);
   border-radius: var(--ts-radius-sm);
   background: color-mix(in srgb, var(--background-primary) 82%, var(--ts-panel) 18%);
   cursor: pointer;
-  transition: background .12s ease, border-color .12s ease;
+  transition: background .12s ease, border-color .12s ease, transform .14s var(--ts-ease);
 }
 
 .ts-timeline-row:hover {
+  transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--ts-accent) 26%, var(--ts-border) 74%);
-  background: var(--ts-hover);
+  background: color-mix(in srgb, var(--ts-accent) 7%, var(--ts-panel) 93%);
 }
 
-.ts-timeline-meta {
+.ts-timeline-rail {
+  width: 4px;
+  min-height: 100%;
+  border-radius: var(--ts-radius-sm) 0 0 var(--ts-radius-sm);
+  background: var(--ts-text-3);
+}
+
+.ts-timeline-row--record .ts-timeline-rail {
+  background: var(--ts-accent);
+}
+
+.ts-timeline-row--output .ts-timeline-rail {
+  background: var(--ts-yellow);
+}
+
+.ts-timeline-row--agent .ts-timeline-rail {
+  background: var(--ts-purple);
+}
+
+.ts-timeline-row--git .ts-timeline-rail {
+  background: var(--ts-green);
+}
+
+.ts-timeline-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
   gap: 3px;
+}
+
+.ts-timeline-top {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .ts-timeline-badge {
   min-width: 0;
   overflow: hidden;
-  padding: 2px 4px;
+  padding: 2px 5px;
+  border: 1px solid var(--ts-border);
   border-radius: 5px;
-  color: #fff;
-  background: var(--ts-text-3);
+  color: var(--ts-text);
+  background: color-mix(in srgb, var(--ts-panel) 84%, var(--background-primary) 16%);
   font-family: var(--ts-mono);
   font-size: 8px;
   font-weight: 800;
@@ -1861,70 +1892,80 @@
 }
 
 .ts-timeline-row--record .ts-timeline-badge {
-  background: var(--ts-accent);
+  color: var(--ts-accent);
+  border-color: color-mix(in srgb, var(--ts-accent) 28%, var(--ts-border) 72%);
 }
 
 .ts-timeline-row--output .ts-timeline-badge {
-  background: color-mix(in srgb, var(--ts-yellow) 86%, #fff 14%);
-  color: #2d1600;
+  color: color-mix(in srgb, var(--ts-yellow) 76%, var(--ts-text) 24%);
+  border-color: color-mix(in srgb, var(--ts-yellow) 34%, var(--ts-border) 66%);
 }
 
 .ts-timeline-row--agent .ts-timeline-badge {
-  background: var(--ts-purple);
+  color: var(--ts-purple);
+  border-color: color-mix(in srgb, var(--ts-purple) 34%, var(--ts-border) 66%);
 }
 
 .ts-timeline-row--git .ts-timeline-badge {
-  background: var(--ts-green);
-  color: #071f0d;
+  color: var(--ts-green);
+  border-color: color-mix(in srgb, var(--ts-green) 34%, var(--ts-border) 66%);
 }
 
 .ts-timeline-time {
-  color: var(--ts-text-3);
-  font-family: var(--ts-mono);
-  font-size: 9px;
-  font-weight: 750;
-  line-height: 1;
-  text-align: center;
-}
-
-.ts-timeline-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ts-timeline-title {
-  min-width: 0;
-  color: var(--ts-text);
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1.22;
-  overflow-wrap: anywhere;
-}
-
-.ts-timeline-subtitle,
-.ts-timeline-line {
   min-width: 0;
   color: var(--ts-text-3);
   font-family: var(--ts-mono);
   font-size: 8.8px;
-  line-height: 1.2;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ts-timeline-title {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--ts-text);
+  font-size: 10.8px;
+  font-weight: 730;
+  line-height: 1.24;
   overflow-wrap: anywhere;
 }
 
-.ts-timeline-detail {
+.ts-timeline-summary {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 1px;
+  overflow: hidden;
+  color: var(--ts-text-2);
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ts-timeline-line {
-  color: var(--ts-text-2);
-  font-family: var(--ts-font);
-  font-size: 9.5px;
+.ts-timeline-chips {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.ts-timeline-chip {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: 999px;
+  color: var(--ts-text-3);
+  background: color-mix(in srgb, var(--ts-panel) 82%, var(--background-primary) 18%);
+  font-family: var(--ts-mono);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Quick actions */
