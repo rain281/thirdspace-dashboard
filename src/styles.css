@@ -394,6 +394,14 @@
   white-space: normal;
 }
 
+.ts-todo-head-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
 /* macOS information dashboard */
 .ts-board {
   height: 100%;
@@ -1132,12 +1140,52 @@
   stroke-width: 2.1;
 }
 
+.ts-todo-copy-btn {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--ts-border);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ts-panel) 82%, var(--background-primary) 18%);
+  box-shadow: none;
+  color: var(--ts-text-3);
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
+}
+
+.ts-todo-copy-btn:hover {
+  border-color: color-mix(in srgb, var(--ts-accent) 35%, var(--ts-border) 65%);
+  background: color-mix(in srgb, var(--ts-accent) 9%, var(--ts-panel) 91%);
+  color: var(--ts-accent);
+}
+
+.ts-todo-copy-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.1;
+}
+
 .ts-todo-content {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+.ts-todo-row-copy {
+  margin-top: 2px;
+  opacity: .72;
+}
+
+.ts-todo-row:hover .ts-todo-row-copy,
+.ts-todo-row-copy:focus-visible {
+  opacity: 1;
 }
 
 .ts-todo-project {

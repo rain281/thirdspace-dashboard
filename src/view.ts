@@ -226,8 +226,18 @@ export class DashboardView extends ItemView {
     const todoCard = todoCol.createDiv({ cls: "ts-card ts-compact-card ts-todo-card" });
     const tdHd = todoCard.createDiv({ cls: "ts-card-head" });
     tdHd.createSpan({ cls: "ts-card-label", text: "TODAY'S TODOS" });
-    const tdMeta = tdHd.createSpan({ cls: "ts-card-meta ts-todo-meta" });
+    const todoActions = tdHd.createSpan({ cls: "ts-todo-head-actions" });
+    const tdMeta = todoActions.createSpan({ cls: "ts-card-meta ts-todo-meta" });
     if (pending.length > 0) tdMeta.setText(`${pending.length} pending`);
+    const copyAll = todoActions.createEl("button", {
+      cls: "ts-todo-copy-btn",
+      attr: { "aria-label": "复制未完成 Todo", title: "复制未完成 Todo" },
+    });
+    setIcon(copyAll, "copy");
+    copyAll.addEventListener("click", ev => {
+      ev.stopPropagation();
+      void this.copyPendingTodos(todos);
+    });
     this.renderTodos(todoCard, todos);
 
     const backlogCol = board.createDiv({ cls: "ts-board-col ts-backlog-col" });
@@ -599,6 +609,29 @@ export class DashboardView extends ItemView {
     return { project: match[1], body: match[2] };
   }
 
+  private async copyTextToClipboard(text: string, successMessage: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      new Notice(successMessage);
+    } catch {
+      new Notice("复制失败，请手动打开今日日志复制");
+    }
+  }
+
+  private async copyTodoText(item: TodoItem) {
+    await this.copyTextToClipboard(item.text, "已复制 Todo");
+  }
+
+  private async copyPendingTodos(items: TodoItem[]) {
+    const pending = items.filter(item => !item.done);
+    if (pending.length === 0) {
+      new Notice("没有待复制的未完成 Todo");
+      return;
+    }
+    const text = pending.map(item => `- [ ] ${item.text}`).join("\n");
+    await this.copyTextToClipboard(text, `已复制 ${pending.length} 个 Todo`);
+  }
+
   private renderTodoRow(parent: HTMLElement, item: TodoItem) {
     const row = parent.createDiv({ cls: `ts-todo-row${item.done ? " ts-todo-done" : ""}` });
     const chk = row.createEl("button", {
@@ -614,6 +647,17 @@ export class DashboardView extends ItemView {
       content.createSpan({ cls: "ts-todo-txt", text: display.body });
     };
     renderTodoText();
+
+    const copy = row.createEl("button", {
+      cls: "ts-todo-copy-btn ts-todo-row-copy",
+      attr: { "aria-label": "复制 Todo", title: "复制 Todo" },
+    });
+    setIcon(copy, "copy");
+    copy.addEventListener("click", e => {
+      e.stopPropagation();
+      void this.copyTodoText(item);
+    });
+    copy.addEventListener("dblclick", e => e.stopPropagation());
 
     // checkbox 单击 = 切换完成状态（原地更新，无全页刷新）
     chk.addEventListener("click", async e => {
