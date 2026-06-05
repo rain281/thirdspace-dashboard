@@ -31,6 +31,8 @@ import {
   runProjectMaterialsImport,
   type ProjectMaterialsItem,
 } from "./data/project-materials";
+import { loadPortfolioModel } from "./data/project-management-reader";
+import type { PortfolioModel } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
@@ -143,7 +145,7 @@ export class DashboardView extends ItemView {
     contentEl.addClass("ts-dash");
     await this.archiveStaleTodosFromOldWorklogs();
 
-    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials] = await Promise.all([
+    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials, portfolio] = await Promise.all([
       loadWorkspaceIndex(this.app),
       loadProductStatus(this.app),
       getDailyActivity(this.app, 365),
@@ -155,6 +157,7 @@ export class DashboardView extends ItemView {
       refreshProjectDiscovery(this.app),
       loadProjectOnboarding(this.app),
       loadProjectMaterials(this.app),
+      loadPortfolioModel(this.app),
     ]);
 
     const wsDirs    = wsIndex?.map(e => e.dir) ?? [];
@@ -192,7 +195,7 @@ export class DashboardView extends ItemView {
     if (this.activePage === "today") {
       this.renderTodayPage(board, todos, projectBacklog, todayWorklog);
     } else {
-      this.renderProjectsPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
+      this.renderProjectsPage(board, portfolio, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
     this.renderPageSwitch(contentEl);
 
@@ -250,6 +253,7 @@ export class DashboardView extends ItemView {
 
   private renderProjectsPage(
     board: HTMLElement,
+    portfolio: PortfolioModel,
     activity: DailyActivity[],
     projectActivity: ProjectActivity[],
     gitActivity: GitActivitySummary,

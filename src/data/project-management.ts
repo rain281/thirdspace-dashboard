@@ -429,3 +429,11 @@ function hasBlockingText(text: string): boolean {
     .split("\n")
     .some(line => /阻塞|blocked|卡住|等待/.test(line) && !/已解决|已解除|✅/.test(line));
 }
+
+export const FOCUS_WEEK_PATH = ".thirdspace/focus-week.yaml";
+
+export interface PortfolioModel {
+  focusWeek: FocusWeek;
+  projects: ManagedProject[];
+  summary: PortfolioSummary;
+}
