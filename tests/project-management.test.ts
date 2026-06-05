@@ -180,3 +180,50 @@ assert.equal(summary.focusUsed, 2);
 assert.equal(summary.riskCount, 1);
 assert.equal(summary.noNextStepCount, 1);
 assert.equal(summary.staleCount, 1);
+
+const statusArchivedMarkdown = standardMarkdown
+  .replace('project: "kora"', 'project: "archived-in-status"')
+  .replace('lifecycle: "active"', 'lifecycle: "archived"');
+const managedWithoutStatusArchived = deriveManagedProjects({
+  projects: [
+    {
+      id: "archived-in-status",
+      name: "Archived In Status",
+      lifecycle: "active",
+      workspace: "04-项目/产品系统/Archived In Status",
+      status_note: "04-项目/产品系统/Archived In Status/项目状态.md",
+    },
+  ],
+  statuses: new Map([
+    ["archived-in-status", parseProjectStatusMarkdown(statusArchivedMarkdown, "archived-in-status.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+});
+
+assert.equal(managedWithoutStatusArchived.length, 0);
+
+const blockedPendingDecisionMarkdown = standardMarkdown
+  .replace('project: "kora"', 'project: "blocked-decision"')
+  .replace('priority: "P0"', 'priority: "P1"')
+  .replace("## 风险与阻塞\n- [ ] 状态模板尚未统一", "## 风险与阻塞\n")
+  .replace("## 待决策\n- [ ] Portfolio 首屏密度", "## 待决策\n- [ ] 等待确认 Portfolio 首屏密度");
+const blockedDecisionProject = deriveManagedProjects({
+  projects: [
+    {
+      id: "blocked-decision",
+      name: "Blocked Decision",
+      lifecycle: "active",
+      workspace: "04-项目/产品系统/Blocked Decision",
+      status_note: "04-项目/产品系统/Blocked Decision/项目状态.md",
+    },
+  ],
+  statuses: new Map([
+    ["blocked-decision", parseProjectStatusMarkdown(blockedPendingDecisionMarkdown, "blocked-decision.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+})[0];
+
+assert.equal(blockedDecisionProject.health.status, "风险");
+assert.ok(blockedDecisionProject.health.reasons.includes("存在待决策"));

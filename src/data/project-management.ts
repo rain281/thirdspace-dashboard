@@ -320,10 +320,10 @@ export interface DeriveManagedProjectsInput {
 export function deriveManagedProjects(input: DeriveManagedProjectsInput): ManagedProject[] {
   const focusById = new Map(input.focusWeek.focusProjects.map(item => [item.id, item]));
   return input.projects
-    .filter(project => normalizeLifecycle(project.lifecycle) !== "archived")
-    .map(project => {
+    .flatMap(project => {
       const status = input.statuses.get(project.id);
       const lifecycle = status?.lifecycle ?? normalizeLifecycle(project.lifecycle);
+      if (lifecycle === "archived") return [];
       const focus = focusById.get(project.id);
       const managed: ManagedProject = {
         id: project.id,
@@ -385,6 +385,7 @@ function deriveProjectHealth(project: ManagedProject, now: Date): ProjectHealth 
   const riskReasons = new Set(["缺下一步", "状态超过 7 天未更新", "存在未处理风险", "交付阶段缺交付门禁"]);
   const isRisk = project.priority === "P0" && reasons.some(reason => riskReasons.has(reason))
     || hasBlockingText(project.risks)
+    || hasBlockingText(project.pendingDecisions)
     || (project.stage === "交付" && reasons.includes("交付阶段缺交付门禁"));
 
   return {
