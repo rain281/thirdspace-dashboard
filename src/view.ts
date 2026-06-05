@@ -38,6 +38,18 @@ export const VIEW_TYPE = "thirdspace-dashboard";
 type DashboardPage = "today" | "projects";
 type TimelineFilter = "all" | TimelineKind;
 
+interface TodayMetrics {
+  total: number;
+  pending: number;
+  done: number;
+  outputs: number;
+  git: number;
+  agent: number;
+  projects: number;
+  blocked: number;
+  focus?: TodoItem;
+}
+
 // ── Todo Input Modal ──────────────────────────────────────────
 class TodoModal extends Modal {
   private onSubmit: (text: string) => void;
@@ -604,7 +616,7 @@ export class DashboardView extends ItemView {
     });
   }
 
-  // ── Today: ## 今日重点 + ## 今日Todo + ## 重点记录 + event stream ──
+  // ── Today: ## 今日重点 + metrics + event stream ──
   private emptyTodayWorklog(): TodayWorklog {
     return { highlights: [], todos: [], entries: [], outputs: [], events: [], timeline: [] };
   }
@@ -633,22 +645,9 @@ export class DashboardView extends ItemView {
       }
     }
 
-    const todoCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--todo" });
-    todoCard.createDiv({ cls: "ts-today-subhead", text: "今日Todo" });
-    const todoBody = todoCard.createDiv({ cls: "ts-today-scroll" });
-    if (today.todos.length === 0) {
-      todoBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示 Todo" : "No todos" });
-    } else {
-      const todoWrap = todoBody.createDiv({ cls: "ts-log-section" });
-      const pendingTodos = today.todos.filter(t => !t.done);
-      const doneTodos = today.todos.filter(t => t.done);
-      for (const item of [...pendingTodos, ...doneTodos]) {
-        const row = todoWrap.createDiv({ cls: `ts-log-todo-row${item.done ? " ts-log-todo-done" : ""}` });
-        row.addEventListener("click", openToday);
-        row.createSpan({ cls: "ts-log-todo-box", text: item.done ? "☑" : "☐" });
-        row.createSpan({ cls: "ts-log-todo-text", text: item.text });
-      }
-    }
+    const metricsCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--metrics" });
+    metricsCard.createDiv({ cls: "ts-today-subhead", text: "今日指标" });
+    this.renderTodayMetrics(metricsCard, today, missingLog);
 
     const flowCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--flow" });
     const flowHead = flowCard.createDiv({ cls: "ts-today-subhead ts-timeline-head" });
@@ -667,6 +666,95 @@ export class DashboardView extends ItemView {
     } else {
       flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示记录/产出" : "No records" });
     }
+  }
+
+  private renderTodayMetrics(parent: HTMLElement, today: TodayWorklog, missingLog = false) {
+    const metrics = this.calculateTodayMetrics(today);
+    const body = parent.createDiv({ cls: "ts-today-scroll ts-today-metrics-body" });
+    const openToday = () => this.openTodayLog();
+
+    const grid = body.createDiv({ cls: "ts-today-metric-grid" });
+    const tiles: Array<{ label: string; value: string; tone?: string }> = [
+      { label: "承诺", value: String(metrics.total) },
+      { label: "待完成", value: String(metrics.pending), tone: metrics.pending > 0 ? "active" : "quiet" },
+      { label: "完成", value: String(metrics.done), tone: metrics.done > 0 ? "good" : "quiet" },
+      { label: "产出", value: String(metrics.outputs), tone: metrics.outputs > 0 ? "good" : "quiet" },
+      { label: "Git", value: String(metrics.git), tone: metrics.git > 0 ? "good" : "quiet" },
+      { label: "Agent", value: String(metrics.agent), tone: metrics.agent > 0 ? "active" : "quiet" },
+      { label: "项目", value: String(metrics.projects), tone: metrics.projects > 0 ? "active" : "quiet" },
+      { label: "阻塞", value: String(metrics.blocked), tone: metrics.blocked > 0 ? "warn" : "quiet" },
+    ];
+
+    for (const tile of tiles) {
+      const item = grid.createDiv({ cls: `ts-today-metric ts-today-metric--${tile.tone ?? "quiet"}` });
+      item.addEventListener("click", openToday);
+      item.createDiv({ cls: "ts-today-metric-value", text: tile.value });
+      item.createDiv({ cls: "ts-today-metric-label", text: tile.label });
+    }
+
+    const focus = body.createDiv({ cls: `ts-today-focus${metrics.blocked > 0 ? " ts-today-focus--warn" : ""}` });
+    focus.addEventListener("click", openToday);
+    focus.createDiv({ cls: "ts-today-focus-label", text: metrics.blocked > 0 ? "阻塞提示" : "当前焦点" });
+    if (missingLog) {
+      focus.createDiv({ cls: "ts-today-focus-text", text: "创建今日日志后显示指标" });
+    } else if (metrics.blocked > 0) {
+      focus.createDiv({ cls: "ts-today-focus-text", text: `${metrics.blocked} 个条目包含 blocked / 阻塞 / 等待 / 卡住` });
+    } else if (metrics.focus) {
+      focus.createDiv({ cls: "ts-today-focus-text", text: metrics.focus.text });
+    } else {
+      focus.createDiv({ cls: "ts-today-focus-text", text: metrics.total > 0 ? "今日 Todo 已完成" : "暂无今日 Todo" });
+    }
+  }
+
+  private calculateTodayMetrics(today: TodayWorklog): TodayMetrics {
+    const pendingTodos = today.todos.filter(todo => !todo.done);
+    return {
+      total: today.todos.length,
+      pending: pendingTodos.length,
+      done: today.todos.filter(todo => todo.done).length,
+      outputs: today.timeline.filter(item => item.kind === "output").length,
+      git: today.timeline.filter(item => item.kind === "git").length,
+      agent: today.timeline.filter(item => item.kind === "agent").length,
+      projects: this.extractProjectNames(today).size,
+      blocked: this.countBlockedItems(today),
+      focus: pendingTodos[0],
+    };
+  }
+
+  private extractProjectNames(today: TodayWorklog): Set<string> {
+    const names = new Set<string>();
+    for (const todo of today.todos) {
+      const name = this.projectNameFromText(todo.text);
+      if (name) names.add(name);
+    }
+    for (const item of today.timeline) {
+      for (const text of [item.title, item.subtitle, item.raw]) {
+        const name = this.projectNameFromText(text ?? "");
+        if (name) names.add(name);
+      }
+    }
+    return names;
+  }
+
+  private projectNameFromText(text: string): string | null {
+    const trimmed = text.trim();
+    const prefix = trimmed.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]{2,32})[：:]/);
+    if (prefix) return prefix[1];
+    const dotted = trimmed.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]{2,32})\s+·\s+/);
+    if (dotted) return dotted[1];
+    return null;
+  }
+
+  private countBlockedItems(today: TodayWorklog): number {
+    const values = [
+      ...today.todos.map(todo => todo.text),
+      ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw, ...item.body]),
+    ];
+    return values.filter(text => this.isBlockedText(text)).length;
+  }
+
+  private isBlockedText(text: string): boolean {
+    return /\bblocked\b|阻塞|等待|卡住/i.test(text);
   }
 
   private renderTimelineFilters(parent: HTMLElement, items: TimelineItem[]) {

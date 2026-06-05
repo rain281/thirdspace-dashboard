@@ -1177,7 +1177,7 @@
   border-color: color-mix(in srgb, var(--ts-accent) 18%, var(--ts-border) 82%);
 }
 
-.ts-today-subcard--todo {
+.ts-today-subcard--metrics {
   border-color: color-mix(in srgb, var(--ts-green) 18%, var(--ts-border) 82%);
 }
 
@@ -1222,6 +1222,109 @@
 .ts-today-empty {
   padding: 4px 2px 6px;
   font-size: 11px;
+}
+
+.ts-today-metrics-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ts-today-metric-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.ts-today-metric {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--ts-panel) 16%);
+  cursor: pointer;
+}
+
+.ts-today-metric:hover,
+.ts-today-focus:hover {
+  background: var(--ts-hover);
+}
+
+.ts-today-metric--active {
+  border-color: color-mix(in srgb, var(--ts-accent) 28%, var(--ts-border) 72%);
+}
+
+.ts-today-metric--good {
+  border-color: color-mix(in srgb, var(--ts-green) 28%, var(--ts-border) 72%);
+}
+
+.ts-today-metric--warn {
+  border-color: color-mix(in srgb, var(--ts-yellow) 45%, var(--ts-border) 55%);
+  background: color-mix(in srgb, var(--ts-yellow) 9%, var(--background-primary) 91%);
+}
+
+.ts-today-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-family: var(--ts-mono);
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 850;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-today-metric-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-size: 8.2px;
+  line-height: 1.1;
+  font-weight: 750;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-today-focus {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 6px;
+  border: 1px solid color-mix(in srgb, var(--ts-accent) 16%, var(--ts-border) 84%);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--ts-accent) 6%, var(--background-primary) 94%);
+  cursor: pointer;
+}
+
+.ts-today-focus--warn {
+  border-color: color-mix(in srgb, var(--ts-yellow) 42%, var(--ts-border) 58%);
+  background: color-mix(in srgb, var(--ts-yellow) 9%, var(--background-primary) 91%);
+}
+
+.ts-today-focus-label {
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.ts-today-focus-text {
+  min-width: 0;
+  color: var(--ts-text);
+  font-size: 10.5px;
+  line-height: 1.2;
+  font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .ts-today-init {
