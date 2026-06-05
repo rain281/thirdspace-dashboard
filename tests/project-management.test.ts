@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import {
   currentIsoWeek,
+  deriveManagedProjects,
+  derivePortfolioSummary,
   parseFocusWeekYaml,
   parseProjectStatusMarkdown,
   STANDARD_PROJECT_STATUS_SECTIONS,
+  type ProjectIndexLike,
 } from "../src/data/project-management";
 
 const standardMarkdown = `---
@@ -113,3 +116,67 @@ const fallbackFocus = parseFocusWeekYaml("");
 assert.equal(fallbackFocus.focusLimit, 3);
 assert.equal(fallbackFocus.focusProjects.length, 0);
 assert.match(currentIsoWeek(new Date("2026-06-05T12:00:00+08:00")), /^2026-W23$/);
+
+const indexProjects: ProjectIndexLike[] = [
+  {
+    id: "kora",
+    name: "Kora",
+    category: "产品系统",
+    lifecycle: "active",
+    workspace: "04-项目/产品系统/Kora",
+    repo_path: "/Volumes/资料/projects/Kora",
+    project_home: "04-项目/产品系统/Kora/首页.md",
+    status_note: "04-项目/产品系统/Kora/Kora项目状态.md",
+    codex_context: "04-项目/产品系统/Kora/Kora-Codex上下文.md",
+  },
+  {
+    id: "pilot",
+    name: "Pilot",
+    category: "产品系统",
+    lifecycle: "watch",
+    workspace: "04-项目/产品系统/Pilot",
+    status_note: "04-项目/产品系统/Pilot/Pilot项目状态.md",
+  },
+  {
+    id: "xiaohuanzi",
+    name: "小桓子",
+    category: "产品系统",
+    lifecycle: "archived",
+    workspace: "99-归档/完结项目/小桓子",
+    status_note: "99-归档/完结项目/小桓子/小桓子项目状态.md",
+  },
+];
+
+const staleMarkdown = standardMarkdown.replace('updated: "2026-06-05"', 'updated: "2026-05-20"');
+const noNextStepMarkdown = standardMarkdown
+  .replace('project: "kora"', 'project: "pilot"')
+  .replace('priority: "P0"', 'priority: "P1"')
+  .replace('stage: "构建"', 'stage: "交付"')
+  .replace('updated: "2026-06-05"', 'updated: "2026-06-01"')
+  .replace("- [ ] 完成 Portfolio 只读版", "");
+
+const managed = deriveManagedProjects({
+  projects: indexProjects,
+  statuses: new Map([
+    ["kora", parseProjectStatusMarkdown(staleMarkdown, "kora.md")],
+    ["pilot", parseProjectStatusMarkdown(noNextStepMarkdown, "pilot.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+});
+
+assert.equal(managed.length, 2);
+assert.equal(managed[0].id, "kora");
+assert.equal(managed[0].focusRole, "main");
+assert.equal(managed[0].health.status, "风险");
+assert.ok(managed[0].health.reasons.includes("状态超过 7 天未更新"));
+assert.equal(managed[1].id, "pilot");
+assert.equal(managed[1].focusRole, "support");
+assert.ok(managed[1].health.reasons.includes("缺下一步"));
+
+const summary = derivePortfolioSummary(managed, focus);
+assert.equal(summary.totalManaged, 2);
+assert.equal(summary.focusUsed, 2);
+assert.equal(summary.riskCount, 1);
+assert.equal(summary.noNextStepCount, 1);
+assert.equal(summary.staleCount, 1);
