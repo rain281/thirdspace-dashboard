@@ -873,8 +873,8 @@ export class DashboardView extends ItemView {
     const pending = materials.filter(item => item.needsImport);
     const synced = materials.length - pending.length;
     const summary = parent.createDiv({ cls: "ts-material-summary" });
-    summary.createDiv({ cls: `ts-material-pill ${pending.length > 0 ? "ts-material-pill--warn" : "ts-material-pill--ok"}`, text: `${synced}真实/${materials.length}总数 synced` });
-    summary.createDiv({ cls: "ts-material-pill", text: pending.length > 0 ? `${pending.length} pending` : "all current" });
+    summary.createDiv({ cls: `ts-material-pill ${pending.length > 0 ? "ts-material-pill--warn" : "ts-material-pill--ok"}`, text: `${synced}真实/${materials.length}总数 indexed` });
+    summary.createDiv({ cls: "ts-material-pill", text: pending.length > 0 ? `${pending.length} pending` : "index-only" });
 
     const list = parent.createDiv({ cls: "ts-material-list" });
     const visible = materials.slice(0, this.singleScreenLimit.materials);
@@ -900,16 +900,16 @@ export class DashboardView extends ItemView {
     }
     const importBtn = actions.createEl("button", {
       cls: `ts-material-btn ${item.needsImport ? "ts-material-btn--primary" : ""}`,
-      text: item.needsImport ? (item.importedCount > 0 ? "更新" : "导入") : "重扫",
+      text: item.needsImport ? (item.importedCount > 0 ? "更新索引" : "建索引") : "重扫索引",
     });
     importBtn.addEventListener("click", async () => {
       importBtn.disabled = true;
-      importBtn.setText(item.needsImport ? "处理中" : "重扫中");
+      importBtn.setText(item.needsImport ? "索引中" : "重扫中");
       const result = await runProjectMaterialsImport(this.app, item.id);
       if (result) {
-        new Notice(`${item.name} 资料索引完成：${result.importedCount} files`);
+        new Notice(`${item.name} 资料索引完成：${result.indexedCount} files，快照 0`);
       } else {
-        new Notice(`未找到资料导入项目：${item.name}`);
+        new Notice(`未找到资料索引项目：${item.name}`);
       }
       await this.render();
     });

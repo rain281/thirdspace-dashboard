@@ -9,6 +9,7 @@ const MATERIAL_INDEX_NAME = "资料索引.md";
 const MATERIAL_SNAPSHOT_DIR = "资料快照";
 const MAX_FILES_PER_PROJECT = 120;
 const MAX_FILE_BYTES = 512 * 1024;
+const MATERIAL_IMPORT_MODE = "index-only";
 
 const ROOT_DOC_NAMES = new Set([
   "README.md",
@@ -46,8 +47,8 @@ export interface ProjectMaterialsItem {
 
 export interface ProjectMaterialsImportResult {
   project: ProjectMaterialsItem;
-  importedCount: number;
   indexedCount: number;
+  snapshotCount: number;
   skippedCount: number;
   indexPath: string;
   snapshotDir: string;
@@ -71,7 +72,8 @@ interface MaterialManifest {
     index_path: string;
     snapshot_dir: string;
     file_count: number;
-    files: Array<{ relative_path: string; hash: string; size: number; snapshot_path: string }>;
+    mode?: "index-only" | "snapshot";
+    files: Array<{ relative_path: string; hash: string; size: number; source_path?: string; snapshot_path?: string }>;
   }>;
 }
 
@@ -107,11 +109,11 @@ export async function loadProjectMaterials(app: App): Promise<ProjectMaterialsIt
     const needsImport = candidates.length > 0 && (!indexExists || importedCount === 0 || newCount > 0 || changedCount > 0 || staleCount > 0);
     const reason = needsImport
       ? importedCount === 0
-        ? `${candidates.length} files 可导入`
+        ? `${candidates.length} files 可索引`
         : `新增 ${newCount} / 变更 ${changedCount} / 移除 ${staleCount}`
       : candidates.length === 0
         ? "未发现资料文档"
-        : `${syncedCount} files 已同步`;
+        : `${syncedCount} files 已索引`;
 
     items.push({
       id: project.id,
@@ -146,26 +148,21 @@ export async function runProjectMaterialsImport(app: App, projectId: string): Pr
   if (!item) return null;
 
   const candidates = await findMaterialCandidates(item.repoPath);
-  await ensureVaultFolder(app, item.snapshotDir);
-  const importedFiles: MaterialManifest["projects"][number]["files"] = [];
+  await removeLegacySnapshotDir(app, item.snapshotDir);
+  const indexedFiles: MaterialManifest["projects"][number]["files"] = [];
   let skippedCount = 0;
 
   for (const candidate of candidates) {
-    const snapshotPath = `${item.snapshotDir}/${candidate.relativePath}`;
-    await ensureVaultFolder(app, nodePath.posix.dirname(snapshotPath));
-    const raw = await fs.readFile(candidate.absPath, "utf8");
-    const content = renderSnapshot(project.name, item.workspace, candidate, raw);
-    await writeVaultFileIfChanged(app, snapshotPath, content);
-    importedFiles.push({
+    indexedFiles.push({
       relative_path: candidate.relativePath,
       hash: candidate.hash,
       size: candidate.size,
-      snapshot_path: snapshotPath,
+      source_path: candidate.absPath,
     });
   }
 
   skippedCount += Math.max(0, item.candidateCount - candidates.length);
-  const indexMarkdown = renderMaterialIndex(project.name, item, candidates, importedFiles);
+  const indexMarkdown = renderMaterialIndex(project.name, item, candidates, indexedFiles);
   await writeVaultFileIfChanged(app, item.indexPath, indexMarkdown);
   await updateManifest(app, {
     id: project.id,
@@ -175,15 +172,16 @@ export async function runProjectMaterialsImport(app: App, projectId: string): Pr
     imported_at: localTimestamp(new Date()),
     index_path: item.indexPath,
     snapshot_dir: item.snapshotDir,
-    file_count: importedFiles.length,
-    files: importedFiles,
+    mode: MATERIAL_IMPORT_MODE,
+    file_count: indexedFiles.length,
+    files: indexedFiles,
   });
-  await appendMaterialsEvent(app, project.name, item.repoPath, importedFiles.length, item.indexPath);
+  await appendMaterialsEvent(app, project.name, item.repoPath, indexedFiles.length, item.indexPath);
 
   return {
     project: item,
-    importedCount: importedFiles.length,
     indexedCount: candidates.length,
+    snapshotCount: 0,
     skippedCount,
     indexPath: item.indexPath,
     snapshotDir: item.snapshotDir,
@@ -237,45 +235,15 @@ async function maybePushCandidate(repoPath: string, absPath: string, result: Mat
   });
 }
 
-function renderSnapshot(projectName: string, workspace: string, candidate: MaterialCandidate, raw: string): string {
-  const now = localTimestamp(new Date());
-  return [
-    "---",
-    `title: "${escapeYaml(`${projectName} ${candidate.relativePath}`)}"`,
-    'type: "reference"',
-    `topic: "${escapeYaml(projectName)}"`,
-    'workspace: "04-项目"',
-    `created: "${now}"`,
-    `modified: "${now}"`,
-    'tags: ["project-material", "snapshot"]',
-    'source: "project-material-import"',
-    'status: "snapshot"',
-    `project: "${escapeYaml(projectName)}"`,
-    `source_path: "${escapeYaml(candidate.absPath)}"`,
-    `migrated_from: "${escapeYaml(candidate.absPath)}"`,
-    `source_hash: "${candidate.hash}"`,
-    "---",
-    "",
-    `# ${candidate.relativePath}`,
-    "",
-    `> Project: ${projectName}`,
-    `> Source: \`${candidate.absPath}\``,
-    `> Imported into: \`${workspace}\``,
-    "",
-    raw.trimEnd(),
-    "",
-  ].join("\n");
-}
-
 function renderMaterialIndex(
   projectName: string,
   item: ProjectMaterialsItem,
   candidates: MaterialCandidate[],
-  importedFiles: MaterialManifest["projects"][number]["files"],
+  indexedFiles: MaterialManifest["projects"][number]["files"],
 ): string {
   const now = localTimestamp(new Date());
-  const rows = importedFiles.map(file =>
-    `| \`${file.relative_path}\` | ${file.size} | \`${file.hash.slice(0, 12)}\` | [[${file.snapshot_path.replace(/\.md$/i, "")}|snapshot]] |`,
+  const rows = indexedFiles.map(file =>
+    `| \`${file.relative_path}\` | ${file.size} | \`${file.hash.slice(0, 12)}\` | 索引-only |`,
   );
   return [
     "---",
@@ -296,14 +264,17 @@ function renderMaterialIndex(
     "",
     "## 范围",
     "",
-    "- 只导入项目资料文档，不导入源码、依赖目录、密钥文件和二进制。",
+    "- 默认只索引项目资料文档，不复制全文快照。",
     "- 来源范围：根目录 README/AGENTS/CLAUDE/CHANGELOG/DESIGN/CONVENTIONS/GAME_DESIGN，以及 docs/plans/specs/design 目录。",
+    "- 不导入源码、依赖目录、密钥文件和二进制。",
+    "- 需要全文快照时必须另走显式确认流程，不能由 Dashboard 自动生成。",
     `- 候选文件：${candidates.length}真实/${candidates.length}总数。`,
-    `- 导入快照：${importedFiles.length}真实/${candidates.length}总数。`,
+    `- 已索引：${indexedFiles.length}真实/${candidates.length}总数。`,
+    "- 导入快照：0真实/0总数。",
     "",
     "## 文件",
     "",
-    "| Source | Size | Hash | Snapshot |",
+    "| Source | Size | Hash | Mode |",
     "|---|---:|---|---|",
     ...rows,
     "",
@@ -335,7 +306,7 @@ async function appendMaterialsEvent(app: App, projectName: string, repoPath: str
   const markdown = await app.vault.read(file);
   const timestamp = localTimestamp(new Date());
   const eventId = `project_material_import:${projectName}:${timestamp}`;
-  const line = `- ${timestamp} [agent_event:${eventId}] 完成项目资料索引/导入：${projectName}；files=${count}；index=\`${indexPath}\`；repo=\`${repoPath}\``;
+  const line = `- ${timestamp} [agent_event:${eventId}] 完成项目资料索引：${projectName}；indexed=${count}；snapshots=0；index=\`${indexPath}\`；repo=\`${repoPath}\``;
   const next = appendToSection(markdown, "Agent 产出", line, eventId).replace(/modified: ".*?"/, `modified: "${timestamp}"`);
   if (next !== markdown) await app.vault.modify(file, next);
 }
@@ -368,6 +339,14 @@ async function readAdapterFile(app: App, vaultPath: string): Promise<string | nu
   } catch {
     return null;
   }
+}
+
+async function removeLegacySnapshotDir(app: App, snapshotDir: string): Promise<void> {
+  const vaultRoot = normalizePath(vaultAbsPath(app, ""));
+  const absPath = normalizePath(nodePath.join(vaultRoot, snapshotDir));
+  if (!absPath.startsWith(`${vaultRoot}${nodePath.sep}`)) return;
+  if (!(await pathExists(absPath))) return;
+  await fs.rm(absPath, { recursive: true, force: true });
 }
 
 async function ensureVaultFolder(app: App, folderPath: string): Promise<void> {
