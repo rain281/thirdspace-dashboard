@@ -135,3 +135,121 @@ function scalar(value: string | undefined): string {
 function stripQuotes(value: string): string {
   return value.replace(/^["']|["']$/g, "");
 }
+
+export interface FocusProject {
+  id: string;
+  role: FocusRole;
+  reason: string;
+}
+
+export interface OffFocusEvent {
+  date: string;
+  projectId: string;
+  reason: string;
+  target: string;
+}
+
+export interface FocusWeek {
+  week: string;
+  focusLimit: number;
+  focusProjects: FocusProject[];
+  offFocusPolicy: string;
+  offFocusEvents: OffFocusEvent[];
+}
+
+export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek {
+  if (!content.trim()) return emptyFocusWeek(now);
+  const lines = content.split("\n");
+  const focusProjects: FocusProject[] = [];
+  const offFocusEvents: OffFocusEvent[] = [];
+  let week = "";
+  let focusLimit = 3;
+  let offFocusPolicy = "allow_today_with_reason";
+  let list: "focus" | "off-focus" | "" = "";
+  let currentFocus: Partial<FocusProject> | null = null;
+  let currentOffFocus: Partial<OffFocusEvent> | null = null;
+
+  const flushFocus = () => {
+    if (currentFocus?.id && currentFocus.role) {
+      focusProjects.push({
+        id: currentFocus.id,
+        role: currentFocus.role,
+        reason: currentFocus.reason ?? "",
+      });
+    }
+    currentFocus = null;
+  };
+  const flushOffFocus = () => {
+    if (currentOffFocus?.date && currentOffFocus.projectId) {
+      offFocusEvents.push({
+        date: currentOffFocus.date,
+        projectId: currentOffFocus.projectId,
+        reason: currentOffFocus.reason ?? "",
+        target: currentOffFocus.target ?? "",
+      });
+    }
+    currentOffFocus = null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line.startsWith("week:")) week = yamlScalar(line.replace("week:", ""));
+    else if (line.startsWith("focus_limit:")) focusLimit = Number(yamlScalar(line.replace("focus_limit:", ""))) || 3;
+    else if (line.startsWith("off_focus_policy:")) offFocusPolicy = yamlScalar(line.replace("off_focus_policy:", ""));
+    else if (line === "focus_projects:") { flushOffFocus(); list = "focus"; }
+    else if (line === "off_focus_events:") { flushFocus(); list = "off-focus"; }
+    else if (line.startsWith("- id:") && list === "focus") {
+      flushFocus();
+      currentFocus = { id: yamlScalar(line.replace("- id:", "")) };
+    } else if (line.startsWith("- date:") && list === "off-focus") {
+      flushOffFocus();
+      currentOffFocus = { date: yamlScalar(line.replace("- date:", "")) };
+    } else if (list === "focus" && currentFocus) {
+      if (line.startsWith("role:")) currentFocus.role = normalizeFocusRole(yamlScalar(line.replace("role:", "")));
+      if (line.startsWith("reason:")) currentFocus.reason = yamlScalar(line.replace("reason:", ""));
+    } else if (list === "off-focus" && currentOffFocus) {
+      if (line.startsWith("project_id:")) currentOffFocus.projectId = yamlScalar(line.replace("project_id:", ""));
+      if (line.startsWith("reason:")) currentOffFocus.reason = yamlScalar(line.replace("reason:", ""));
+      if (line.startsWith("target:")) currentOffFocus.target = yamlScalar(line.replace("target:", ""));
+    }
+  }
+  flushFocus();
+  flushOffFocus();
+
+  return {
+    week: week || currentIsoWeek(now),
+    focusLimit,
+    focusProjects,
+    offFocusPolicy,
+    offFocusEvents,
+  };
+}
+
+export function currentIsoWeek(date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function emptyFocusWeek(now: Date): FocusWeek {
+  return {
+    week: currentIsoWeek(now),
+    focusLimit: 3,
+    focusProjects: [],
+    offFocusPolicy: "allow_today_with_reason",
+    offFocusEvents: [],
+  };
+}
+
+function normalizeFocusRole(value: string): FocusRole {
+  if (value === "main" || value === "support" || value === "maintenance") return value;
+  return "support";
+}
+
+function yamlScalar(value: string): string {
+  return value.trim().replace(/^["']|["']$/g, "");
+}

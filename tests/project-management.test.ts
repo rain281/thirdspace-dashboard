@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  currentIsoWeek,
+  parseFocusWeekYaml,
   parseProjectStatusMarkdown,
   STANDARD_PROJECT_STATUS_SECTIONS,
 } from "../src/data/project-management";
@@ -79,3 +81,35 @@ assert.equal(missing.stage, "孵化");
 assert.equal(missing.lifecycle, "watch");
 assert.ok(missing.missingSections.includes("目标"));
 assert.equal(STANDARD_PROJECT_STATUS_SECTIONS.includes("交付门禁"), true);
+
+const focus = parseFocusWeekYaml(`week: "2026-W23"
+focus_limit: 3
+focus_projects:
+  - id: "kora"
+    role: "main"
+    reason: "P0 · 当前主产品"
+  - id: "pilot"
+    role: "support"
+    reason: "发布门禁未关闭"
+  - id: "comic-drama"
+    role: "maintenance"
+    reason: "保持管线连续性"
+off_focus_policy: "allow_today_with_reason"
+off_focus_events:
+  - date: "2026-06-05"
+    project_id: "aidv"
+    reason: "临时机会"
+    target: "today"
+`);
+
+assert.equal(focus.week, "2026-W23");
+assert.equal(focus.focusLimit, 3);
+assert.equal(focus.focusProjects[0].id, "kora");
+assert.equal(focus.focusProjects[0].role, "main");
+assert.equal(focus.offFocusEvents[0].projectId, "aidv");
+assert.equal(focus.offFocusEvents[0].reason, "临时机会");
+
+const fallbackFocus = parseFocusWeekYaml("");
+assert.equal(fallbackFocus.focusLimit, 3);
+assert.equal(fallbackFocus.focusProjects.length, 0);
+assert.match(currentIsoWeek(new Date("2026-06-05T12:00:00+08:00")), /^2026-W23$/);
