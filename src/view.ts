@@ -858,7 +858,7 @@ export class DashboardView extends ItemView {
   private blockedTextsFromToday(today: TodayWorklog): string[] {
     const values = [
       ...today.todos.map(todo => todo.text),
-      ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw, ...item.body]),
+      ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw]),
     ];
     return values.filter(text => this.isActiveBlockedText(text));
   }
@@ -913,7 +913,7 @@ export class DashboardView extends ItemView {
   }
 
   private isBlockedText(text: string): boolean {
-    return /\bblocked\b|阻塞|等待|卡住/i.test(text);
+    return /(^|[\s\-*◆])(?:阻塞|等待|卡住)\s*[：:]|(^|[\s\-*◆])blocked\s*(?::|by\b)/i.test(text);
   }
 
   private isResolvedBlockedText(text: string): boolean {
