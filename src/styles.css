@@ -303,23 +303,29 @@
 
 .ts-next-action-title {
   min-width: 0;
+  display: -webkit-box;
   overflow: hidden;
   color: var(--ts-text);
   font-size: 12.5px;
   line-height: 1.2;
   font-weight: 800;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .ts-next-action-reason {
   min-width: 0;
+  display: -webkit-box;
   overflow: hidden;
   color: var(--ts-text-3);
   font-size: 10px;
   line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .ts-next-action-risks {
@@ -421,7 +427,7 @@
 .ts-materials-col { grid-area: materials; }
 
 .ts-board--today {
-  grid-template-rows: 78px minmax(0, 1fr);
+  grid-template-rows: 104px minmax(0, 1fr);
   grid-template-areas:
     "overview overview overview overview overview overview overview overview quick quick quick quick"
     "today today today today today today todo todo todo backlog backlog backlog";
@@ -2668,7 +2674,7 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--today {
-    grid-template-rows: 72px minmax(0, 1fr) 118px;
+    grid-template-rows: 110px minmax(0, 1fr) 118px;
     grid-template-areas:
       "overview overview overview quick quick quick"
       "today today today todo todo todo"
@@ -2698,7 +2704,7 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--today {
-    grid-template-rows: 72px minmax(0, 1fr) 118px;
+    grid-template-rows: 110px minmax(0, 1fr) 118px;
     grid-template-areas:
       "overview overview overview quick quick quick"
       "today today today todo todo todo"
