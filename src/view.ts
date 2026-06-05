@@ -50,6 +50,17 @@ interface TodayMetrics {
   focus?: TodoItem;
 }
 
+interface NextAction {
+  tone: "missing" | "warn" | "todo" | "pool" | "summary" | "idle";
+  badge: string;
+  title: string;
+  reason: string;
+  button: string;
+  target: "today" | "project";
+  projectItem?: ProjectBacklogItem;
+  risks: string[];
+}
+
 // ── Todo Input Modal ──────────────────────────────────────────
 class TodoModal extends Modal {
   private onSubmit: (text: string) => void;
@@ -174,7 +185,7 @@ export class DashboardView extends ItemView {
 
     const board = contentEl.createDiv({ cls: `ts-board ts-board--${this.activePage}` });
     if (this.activePage === "today") {
-      this.renderTodayPage(board, vaultStats, activity, todos, projectBacklog, todayWorklog);
+      this.renderTodayPage(board, todos, projectBacklog, todayWorklog);
     } else {
       this.renderProjectsPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
@@ -184,8 +195,6 @@ export class DashboardView extends ItemView {
 
   private renderTodayPage(
     board: HTMLElement,
-    vaultStats: VaultStats,
-    activity: DailyActivity[],
     todos: TodoItem[],
     projectBacklog: ProjectBacklogItem[],
     todayWorklog: TodayWorklog | null,
@@ -193,9 +202,8 @@ export class DashboardView extends ItemView {
     const pending = todos.filter(t => !t.done);
 
     const overviewCol = board.createDiv({ cls: "ts-board-col ts-overview-col" });
-    const overviewCard = overviewCol.createDiv({ cls: "ts-card ts-compact-card ts-overview-card" });
-    overviewCard.createDiv({ cls: "ts-card-label", text: "OVERVIEW" });
-    this.renderStatsRow(overviewCard, vaultStats, activity.filter(a=>a.count>0).length);
+    const overviewCard = overviewCol.createDiv({ cls: "ts-card ts-compact-card ts-overview-card ts-next-action-card" });
+    this.renderNextAction(overviewCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog, projectBacklog);
 
     const quickCol = board.createDiv({ cls: "ts-board-col ts-quick-col" });
     const actCard = quickCol.createDiv({ cls: "ts-card ts-compact-card ts-quick-card" });
@@ -491,6 +499,53 @@ export class DashboardView extends ItemView {
     }
   }
 
+  private renderNextAction(
+    parent: HTMLElement,
+    today: TodayWorklog,
+    missingLog: boolean,
+    projectBacklog: ProjectBacklogItem[],
+  ) {
+    const action = this.calculateNextAction(today, missingLog, projectBacklog);
+    const head = parent.createDiv({ cls: "ts-next-action-head" });
+    head.createDiv({ cls: "ts-card-label", text: "NEXT ACTION" });
+    head.createDiv({ cls: `ts-next-action-badge ts-next-action-badge--${action.tone}`, text: action.badge });
+
+    const body = parent.createDiv({ cls: "ts-next-action-body" });
+    body.createDiv({ cls: "ts-next-action-title", text: action.title });
+    body.createDiv({ cls: "ts-next-action-reason", text: action.reason });
+
+    const foot = parent.createDiv({ cls: "ts-next-action-foot" });
+    const riskRow = foot.createDiv({ cls: "ts-next-action-risks" });
+    if (action.risks.length === 0) {
+      riskRow.createSpan({ cls: "ts-next-action-risk ts-next-action-risk--quiet", text: "状态正常" });
+    } else {
+      for (const risk of action.risks) riskRow.createSpan({ cls: "ts-next-action-risk", text: risk });
+    }
+
+    const button = foot.createEl("button", { cls: `ts-next-action-btn ts-next-action-btn--${action.tone}`, text: action.button });
+    button.addEventListener("click", async e => {
+      e.stopPropagation();
+      await this.runNextAction(action, button);
+    });
+
+    parent.addEventListener("click", () => {
+      if (action.target === "project" && action.projectItem) this.openFile(action.projectItem.path);
+      else void this.openTodayLog();
+    });
+  }
+
+  private async runNextAction(action: NextAction, button: HTMLButtonElement) {
+    if (action.target === "project" && action.projectItem) {
+      button.disabled = true;
+      button.setText("加入中");
+      await promoteProjectBacklogItemToToday(this.app, action.projectItem);
+      new Notice(`${action.projectItem.project} 已加入今日 Todo`);
+      await this.render();
+      return;
+    }
+    await this.openTodayLog();
+  }
+
   // ── Project backlog (from per-project 未完成事项.md)
   private renderProjectBacklog(parent: HTMLElement, items: ProjectBacklogItem[]) {
     if (items.length === 0) {
@@ -721,6 +776,110 @@ export class DashboardView extends ItemView {
     };
   }
 
+  private calculateNextAction(today: TodayWorklog, missingLog: boolean, projectBacklog: ProjectBacklogItem[]): NextAction {
+    const metrics = this.calculateTodayMetrics(today);
+    const blocked = this.blockedTextsFromToday(today);
+    const risks = this.nextActionRisks(today, metrics, blocked);
+    const firstPending = today.todos.find(todo => !todo.done);
+
+    if (missingLog) {
+      return {
+        tone: "missing",
+        badge: "启动",
+        title: "创建今天工作日志",
+        reason: getTodayWorklogPath(),
+        button: "创建",
+        target: "today",
+        risks,
+      };
+    }
+
+    if (blocked.length > 0) {
+      return {
+        tone: "warn",
+        badge: "阻塞",
+        title: blocked[0],
+        reason: `${blocked.length} 个条目包含 blocked / 阻塞 / 等待 / 卡住`,
+        button: "打开",
+        target: "today",
+        risks,
+      };
+    }
+
+    if (firstPending) {
+      return {
+        tone: "todo",
+        badge: "今日Todo",
+        title: firstPending.text,
+        reason: `${metrics.pending} 个今日 Todo 待完成`,
+        button: "打开",
+        target: "today",
+        risks,
+      };
+    }
+
+    if (projectBacklog.length > 0) {
+      const item = projectBacklog[0];
+      return {
+        tone: "pool",
+        badge: item.project,
+        title: item.text,
+        reason: "没有待完成 Todo，可以从项目池拉入一项",
+        button: "加入今日",
+        target: "project",
+        projectItem: item,
+        risks,
+      };
+    }
+
+    if (today.timeline.length > 0 && !this.todayHasOutput(today)) {
+      return {
+        tone: "summary",
+        badge: "总结",
+        title: "补写今日产出",
+        reason: "今天已有记录，但还没有产出条目",
+        button: "写总结",
+        target: "today",
+        risks,
+      };
+    }
+
+    return {
+      tone: "idle",
+      badge: "启动",
+      title: "设定今日重点",
+      reason: "没有未完成 Todo 或项目池候选",
+      button: "打开",
+      target: "today",
+      risks,
+    };
+  }
+
+  private blockedTextsFromToday(today: TodayWorklog): string[] {
+    const values = [
+      ...today.todos.map(todo => todo.text),
+      ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw, ...item.body]),
+    ];
+    return values.filter(text => this.isBlockedText(text));
+  }
+
+  private todayHasOutput(today: TodayWorklog): boolean {
+    return today.timeline.some(item => item.kind === "output");
+  }
+
+  private todayHasGit(today: TodayWorklog): boolean {
+    return today.timeline.some(item => item.kind === "git");
+  }
+
+  private nextActionRisks(today: TodayWorklog, metrics: TodayMetrics, blocked: string[]): string[] {
+    const risks: string[] = [];
+    if (blocked.length > 0) risks.push(`${blocked.length} 阻塞`);
+    if (metrics.pending >= 5) risks.push(`${metrics.pending} 待办`);
+    if (!this.todayHasOutput(today)) risks.push("无产出");
+    if (!this.todayHasGit(today)) risks.push("无 Git");
+    return risks.slice(0, 3);
+  }
+
   private extractProjectNames(today: TodayWorklog): Set<string> {
     const names = new Set<string>();
     for (const todo of today.todos) {
@@ -746,11 +905,7 @@ export class DashboardView extends ItemView {
   }
 
   private countBlockedItems(today: TodayWorklog): number {
-    const values = [
-      ...today.todos.map(todo => todo.text),
-      ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw, ...item.body]),
-    ];
-    return values.filter(text => this.isBlockedText(text)).length;
+    return this.blockedTextsFromToday(today).length;
   }
 
   private isBlockedText(text: string): boolean {
