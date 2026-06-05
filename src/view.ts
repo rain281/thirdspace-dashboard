@@ -588,6 +588,12 @@ export class DashboardView extends ItemView {
     for (const item of [...pending, ...done]) this.renderTodoRow(list, item);
   }
 
+  private todoDisplayParts(text: string): { project: string | null; body: string } {
+    const match = text.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]{2,32})[：:]\s*(.+)$/);
+    if (!match) return { project: null, body: text };
+    return { project: match[1], body: match[2] };
+  }
+
   private renderTodoRow(parent: HTMLElement, item: TodoItem) {
     const row = parent.createDiv({ cls: `ts-todo-row${item.done ? " ts-todo-done" : ""}` });
     const chk = row.createEl("button", {
@@ -595,7 +601,14 @@ export class DashboardView extends ItemView {
       attr: { "aria-label": item.done ? "Mark todo incomplete" : "Mark todo complete" },
     });
     setIcon(chk, item.done ? "check-square" : "square");
-    const txt = row.createSpan({ cls: "ts-todo-txt", text: item.text });
+    const content = row.createDiv({ cls: "ts-todo-content" });
+    const renderTodoText = () => {
+      const display = this.todoDisplayParts(item.text);
+      content.empty();
+      if (display.project) content.createSpan({ cls: "ts-todo-project", text: display.project });
+      content.createSpan({ cls: "ts-todo-txt", text: display.body });
+    };
+    renderTodoText();
 
     // checkbox 单击 = 切换完成状态（原地更新，无全页刷新）
     chk.addEventListener("click", async e => {
@@ -636,7 +649,8 @@ export class DashboardView extends ItemView {
       input.type  = "text";
       input.value = item.text;
       input.className = "ts-todo-edit-input";
-      txt.replaceWith(input);
+      content.empty();
+      content.appendChild(input);
       input.focus();
       input.select();
 
@@ -653,18 +667,16 @@ export class DashboardView extends ItemView {
           await renameTodoInWorklog(this.app, item, newText);
           item.text = newText;
         }
-        // 原地把 input 换回 span，无全页刷新
-        const span = createEl("span", { cls: "ts-todo-txt", text: item.text });
-        input.replaceWith(span);
+        // 原地恢复任务展示，无全页刷新
+        renderTodoText();
       };
 
       input.addEventListener("keydown", async ev => {
         if (ev.key === "Enter")  { ev.preventDefault(); await save(); }
         if (ev.key === "Escape") {
           saved = true;
-          // 取消：原地恢复原始 span
-          const span = createEl("span", { cls: "ts-todo-txt", text: item.text });
-          input.replaceWith(span);
+          // 取消：原地恢复任务展示
+          renderTodoText();
         }
       });
       input.addEventListener("blur", save);

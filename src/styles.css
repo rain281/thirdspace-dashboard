@@ -1077,26 +1077,30 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 1px 3px 2px 0;
 }
 
 .ts-todo-row {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  padding: 4px 6px;
+  gap: 9px;
+  padding: 8px 9px;
+  min-height: 46px;
+  border: 1px solid var(--ts-border);
   border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 78%, var(--ts-panel) 22%);
   cursor: pointer;
   animation: tsListIn .28s var(--ts-ease) both;
-  transition: background .12s ease, opacity .18s ease, transform .18s var(--ts-ease);
+  transition: background .12s ease, border-color .12s ease, opacity .18s ease, transform .18s var(--ts-ease);
 }
 
 .ts-todo-row:hover {
-  background: var(--ts-hover);
+  background: color-mix(in srgb, var(--ts-accent) 7%, var(--ts-panel) 93%);
+  border-color: var(--ts-border-strong);
 }
 
 .ts-todo-row.ts-todo-done {
@@ -1112,7 +1116,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-top: 0;
+  margin-top: 2px;
   padding: 0;
   border: 0;
   border-radius: 5px;
@@ -1128,19 +1132,52 @@
   stroke-width: 2.1;
 }
 
+.ts-todo-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ts-todo-project {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--ts-accent) 22%, var(--ts-border) 78%);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ts-accent) 8%, var(--ts-panel) 92%);
+  color: var(--ts-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ts-todo-txt {
   flex: 1;
   min-width: 0;
-  overflow: visible;
-  display: block;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   color: var(--ts-text);
-  font-size: 11.5px;
-  line-height: 1.25;
+  font-size: 11.8px;
+  font-weight: 650;
+  line-height: 1.32;
 }
 
 .ts-todo-row.ts-todo-done .ts-todo-txt {
   color: var(--ts-text-3);
   text-decoration: line-through;
+}
+
+.ts-todo-row.ts-todo-done .ts-todo-project {
+  color: var(--ts-text-3);
+  border-color: var(--ts-border);
+  background: color-mix(in srgb, var(--ts-panel) 86%, var(--background-primary) 14%);
 }
 
 .ts-backlog-list {
