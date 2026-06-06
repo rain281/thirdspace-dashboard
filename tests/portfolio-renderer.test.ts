@@ -129,6 +129,26 @@ assert.match(text, /npm run build/);
 parent.findByClass("ts-project-card")?.click();
 assert.deepEqual(opened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
 
+const fallbackOpened: string[] = [];
+const fallbackParent = new FakeElement();
+renderPortfolio(
+  fallbackParent as unknown as HTMLElement,
+  {
+    ...populatedPortfolio,
+    projects: [
+      {
+        ...populatedPortfolio.projects[0],
+        statusNote: "",
+        projectHome: "04-项目/产品系统/Kora/首页.md",
+      },
+    ],
+  },
+  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
+  { openFile: path => fallbackOpened.push(path) },
+);
+fallbackParent.findByClass("ts-project-card")?.click();
+assert.deepEqual(fallbackOpened, ["04-项目/产品系统/Kora/首页.md"]);
+
 const emptyParent = new FakeElement();
 renderPortfolio(
   emptyParent as unknown as HTMLElement,

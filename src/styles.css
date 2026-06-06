@@ -433,6 +433,8 @@
 .ts-recent-col { grid-area: recent; }
 .ts-products-col { grid-area: products; }
 .ts-materials-col { grid-area: materials; }
+.ts-portfolio-col { grid-area: portfolio; }
+.ts-maintenance-col { grid-area: maintenance; }
 
 .ts-board--today {
   grid-template-rows: 104px minmax(0, 1fr);
@@ -442,11 +444,9 @@
 }
 
 .ts-board--projects {
-  grid-template-rows: 182px minmax(0, 1fr) 122px;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-areas:
-    "activity activity activity activity activity activity activity activity activity activity activity activity"
-    "workspace workspace workspace workspace recent recent recent recent materials materials materials materials"
-    "products products products products products products products products products products products products";
+    "portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio maintenance maintenance maintenance maintenance";
 }
 
 .ts-overview-card,
@@ -460,6 +460,204 @@
 .ts-products-card,
 .ts-materials-card {
   height: 100%;
+  overflow: hidden;
+}
+
+.ts-portfolio {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "health health health health health health"
+    "focus focus focus suggestions suggestions suggestions"
+    "risk risk priority priority system system";
+  gap: 8px;
+  overflow: hidden;
+}
+
+.ts-portfolio-health-card { grid-area: health; }
+.ts-weekly-focus-card { grid-area: focus; }
+.ts-focus-suggestions-card { grid-area: suggestions; }
+.ts-risk-queue-card { grid-area: risk; }
+.ts-priority-card { grid-area: priority; }
+.ts-maintenance-strip { grid-area: system; }
+
+.ts-portfolio-health-card,
+.ts-weekly-focus-card,
+.ts-focus-suggestions-card,
+.ts-risk-queue-card,
+.ts-priority-card,
+.ts-maintenance-strip {
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-portfolio-metrics,
+.ts-maintenance-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ts-maintenance-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ts-portfolio-metric {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 82%, var(--ts-panel) 18%);
+}
+
+.ts-portfolio-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-family: var(--ts-mono);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-portfolio-metric-label {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.1;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ts-focus-list,
+.ts-suggestion-list,
+.ts-risk-list,
+.ts-priority-list {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ts-project-card,
+.ts-risk-row {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 80%, var(--ts-panel) 20%);
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease, transform .14s ease;
+}
+
+.ts-project-card:hover,
+.ts-risk-row:hover {
+  transform: translateY(-1px);
+  border-color: var(--ts-border-strong);
+  background: color-mix(in srgb, var(--ts-accent) 8%, var(--ts-panel) 92%);
+}
+
+.ts-project-card-top {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ts-project-name,
+.ts-risk-project {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-size: 11px;
+  line-height: 1.18;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-project-meta {
+  flex: 0 0 auto;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 8.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.ts-project-health,
+.ts-project-milestone,
+.ts-project-next,
+.ts-risk-reasons,
+.ts-risk-next,
+.ts-project-queue {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ts-text-2);
+  font-size: 9.5px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-project-next {
+  color: var(--ts-text);
+}
+
+.ts-project-queue--risk {
+  color: color-mix(in srgb, var(--ts-red) 70%, var(--ts-text) 30%);
+}
+
+.ts-project-queue--decision {
+  color: color-mix(in srgb, var(--ts-yellow) 74%, var(--ts-text) 26%);
+}
+
+.ts-project-queue--gate {
+  color: color-mix(in srgb, var(--ts-accent) 76%, var(--ts-text) 24%);
+}
+
+.ts-health--risk {
+  border-color: color-mix(in srgb, var(--ts-red) 34%, var(--ts-border) 66%);
+}
+
+.ts-health--risk .ts-project-health,
+.ts-health--risk .ts-risk-project {
+  color: color-mix(in srgb, var(--ts-red) 82%, var(--ts-text) 18%);
+}
+
+.ts-health--attention {
+  border-color: color-mix(in srgb, var(--ts-yellow) 34%, var(--ts-border) 66%);
+}
+
+.ts-health--attention .ts-project-health {
+  color: color-mix(in srgb, var(--ts-yellow) 78%, var(--ts-text) 22%);
+}
+
+.ts-health--healthy .ts-project-health {
+  color: color-mix(in srgb, var(--ts-green) 76%, var(--ts-text) 24%);
+}
+
+.ts-maintenance-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: minmax(96px, 1fr);
+  gap: 8px;
   overflow: hidden;
 }
 
@@ -2808,11 +3006,31 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--projects {
-    grid-template-rows: 156px minmax(0, 1fr) 118px;
+    grid-template-rows: minmax(0, 1fr) 180px;
     grid-template-areas:
-      "activity activity activity activity activity activity"
-      "workspace workspace recent recent materials materials"
-      "products products products products products products";
+      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "maintenance maintenance maintenance maintenance maintenance maintenance";
+  }
+
+  .ts-portfolio {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+    grid-template-areas:
+      "health health"
+      "focus focus"
+      "suggestions suggestions"
+      "risk priority"
+      "system system";
+    overflow-y: auto;
+  }
+
+  .ts-portfolio-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ts-maintenance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(100px, 1fr);
   }
 
   .ts-stats-row {
@@ -2821,6 +3039,37 @@ body.theme-dark .ts-dash {
 
   .ts-act-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 720px) {
+  .ts-board--projects {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) 180px;
+    grid-template-areas:
+      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "maintenance maintenance maintenance maintenance maintenance maintenance";
+  }
+
+  .ts-portfolio {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+    grid-template-areas:
+      "health health"
+      "focus focus"
+      "suggestions suggestions"
+      "risk priority"
+      "system system";
+    overflow-y: auto;
+  }
+
+  .ts-portfolio-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ts-maintenance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(100px, 1fr);
   }
 }
 
@@ -2838,11 +3087,10 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--projects {
-    grid-template-rows: 156px minmax(0, 1fr) 118px;
+    grid-template-rows: minmax(0, 1fr) 180px;
     grid-template-areas:
-      "activity activity activity activity activity activity"
-      "workspace workspace recent recent materials materials"
-      "products products products products products products";
+      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
   .ts-stats-row {
@@ -2850,6 +3098,23 @@ body.theme-dark .ts-dash {
   }
 
   .ts-ws-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ts-portfolio {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto;
+    grid-template-areas:
+      "health"
+      "focus"
+      "suggestions"
+      "risk"
+      "priority"
+      "system";
+  }
+
+  .ts-portfolio-metrics,
+  .ts-maintenance-grid {
     grid-template-columns: 1fr;
   }
 }
