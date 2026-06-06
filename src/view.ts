@@ -145,7 +145,7 @@ export class DashboardView extends ItemView {
     contentEl.addClass("ts-dash");
     await this.archiveStaleTodosFromOldWorklogs();
 
-    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials, portfolio] = await Promise.all([
+    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials] = await Promise.all([
       loadWorkspaceIndex(this.app),
       loadProductStatus(this.app),
       getDailyActivity(this.app, 365),
@@ -157,7 +157,6 @@ export class DashboardView extends ItemView {
       refreshProjectDiscovery(this.app),
       loadProjectOnboarding(this.app),
       loadProjectMaterials(this.app),
-      loadPortfolioModel(this.app),
     ]);
 
     const wsDirs    = wsIndex?.map(e => e.dir) ?? [];
@@ -195,6 +194,7 @@ export class DashboardView extends ItemView {
     if (this.activePage === "today") {
       this.renderTodayPage(board, todos, projectBacklog, todayWorklog);
     } else {
+      const portfolio = await loadPortfolioModel(this.app);
       this.renderProjectsPage(board, portfolio, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
     this.renderPageSwitch(contentEl);
