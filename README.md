@@ -42,7 +42,8 @@
 | **TODAY** | 今日工作日志：`## 今日重点` 摘要 + `## 重点记录` 时间轴 |
 | **TODAY'S TODOS** | 读取今日工作日志 `## 今日Todo`，**双击行**或点击 ☐ 切换完成状态 |
 | **QUICK** | 新笔记（自动填写规范 frontmatter）/ 今日志 / **记TODO弹框** / 搜索 / 收件箱 |
-| **PRODUCTS** | 读取 `04-项目/product-status.md`，展示产品/项目状态 |
+| **PROJECTS / PORTFOLIO** | 读取 `.thirdspace/project-index.yaml`、项目状态笔记和可选 Focus Week，展示项目组合健康、本周 Focus、风险/决策队列 |
+| **SYSTEM / INBOX** | 保留项目发现、接入、资料索引、旧 `product-status.md` 等维护信号 |
 | **RECENT** | 最近 7 天修改的文件，基于 frontmatter `modified` 字段 |
 
 ## 数据源映射
@@ -58,7 +59,8 @@
 | **WORKSPACES**（文件数/活跃时间） | `.thirdspace/workspace-index.yaml` + 各工作区目录下所有 `.md` | `frontmatter.modified`（fallback: `stat.mtime`） | yaml 缺失时降级为 8 个默认目录 |
 | **TODAY 工作日志** | `02-日记/工作日志/YYYYMMDD_工作日志_周X.md` | `## 今日重点`、`## 重点记录` | 文件不存在则面板隐藏 |
 | **TODAY'S TODOS** | 同上，今日工作日志 | `## 今日Todo`，格式 `- [ ] xxx` / `- [x] xxx ✅ YYYY-MM-DD` | 无 todo 文件则空列表 |
-| **PRODUCTS** | `04-项目/product-status.md` | `## 🟢/🟡/🔴 分组标题`、`### 产品名`、`当前里程碑：xxx` | 文件不存在则面板隐藏 |
+| **PROJECTS / PORTFOLIO** | `.thirdspace/project-index.yaml` + 每个项目的 `status_note` + 可选 `.thirdspace/focus-week.yaml` | 项目索引字段、标准项目状态 section、本周 Focus | 索引或状态缺失时降级为空 Portfolio / 注意状态 |
+| **SYSTEM / INBOX** | `.thirdspace/project-index.yaml`、项目接入/资料索引、旧 `04-项目/product-status.md` | 项目发现、onboarding、materials、旧产品状态 | 缺失时只隐藏对应维护信号 |
 | **RECENT** | 全库所有 `.md` | `frontmatter.modified`（fallback: `stat.mtime`） | 降级到文件系统时间 |
 
 ### 工作日志文件路径规则
@@ -120,6 +122,25 @@ workspaces:
 ```
 
 状态通过 `## ` 标题行中的 emoji 识别：`🟢` = active，`🟡` = watch，`🔴/搁置/放弃` = paused。
+
+### 项目 Portfolio 数据源
+
+Portfolio 是「项目系统」页的主界面，项目入口来自 Vault 根目录下的 `.thirdspace/project-index.yaml`。每个非 archived 项目可通过 `status_note` 指向标准项目状态笔记；Dashboard 会读取目标、成功标准、当前里程碑、下一步、风险与阻塞、待决策、交付门禁、最近状态等 section，并派生健康状态。
+
+可选的 `.thirdspace/focus-week.yaml` 用于标记本周 Focus：
+
+```yaml
+week: "2026-W23"
+focus_limit: 3
+focus_projects:
+  - id: "kora"
+    role: "main"
+    reason: "P0 · 当前主产品"
+off_focus_policy: "allow_today_with_reason"
+off_focus_events: []
+```
+
+`04-项目/product-status.md` 仍作为 SYSTEM / INBOX 维护信号读取，不再是项目系统主数据源。
 
 ### 统计排除规则
 

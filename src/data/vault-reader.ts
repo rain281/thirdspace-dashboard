@@ -231,6 +231,10 @@ export async function loadProjectIndex(app: App): Promise<ProjectIndexEntry[]> {
   }
 }
 
+export function filterManagedProjectIndexEntries(projects: ProjectIndexEntry[]): ProjectIndexEntry[] {
+  return projects.filter(project => project.workspace && project.lifecycle !== "archived");
+}
+
 function parseProjectIndexYaml(content: string): ProjectIndexEntry[] {
   const entries: ProjectIndexEntry[] = [];
   let cur: Partial<ProjectIndexEntry> | null = null;
@@ -305,7 +309,7 @@ export async function getDailyActivity(app: App, days = 365): Promise<DailyActiv
 }
 
 export async function getProjectActivity(app: App, days = 90): Promise<ProjectActivity[]> {
-  const projects = await loadProjectIndex(app);
+  const projects = filterManagedProjectIndexEntries(await loadProjectIndex(app));
   const allFiles = await listMarkdownFiles(app);
   const cutoff = Date.now() - days * 86_400_000;
   return projects.map(project => {
