@@ -34,6 +34,7 @@ import {
 import { loadPortfolioModel } from "./data/project-management-reader";
 import type { PortfolioModel } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
+import { renderPortfolio } from "./components/portfolio";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
@@ -264,29 +265,41 @@ export class DashboardView extends ItemView {
     onboarding: ProjectOnboardingItem[],
     materials: ProjectMaterialsItem[],
   ) {
-    const activityCol = board.createDiv({ cls: "ts-board-col ts-activity-col" });
-    const heatSec  = activityCol.createDiv({ cls: "ts-card ts-compact-card ts-heatmap-card" });
+    const portfolioCol = board.createDiv({ cls: "ts-board-col ts-portfolio-col" });
+    renderPortfolio(
+      portfolioCol,
+      portfolio,
+      {
+        discoveryPending: discovery.pending.length,
+        onboardingPending: onboarding.filter(item => item.needsOnboarding).length,
+        materialsPending: materials.filter(item => item.needsImport).length,
+        recentCount: recent.length,
+      },
+      {
+        openFile: path => this.openFile(path),
+      },
+    );
+
+    const maintenanceCol = board.createDiv({ cls: "ts-board-col ts-maintenance-col" });
+    const heatSec  = maintenanceCol.createDiv({ cls: "ts-card ts-compact-card ts-heatmap-card" });
     if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; }
     this.renderActivityDashboard(heatSec, activity, projectActivity, gitActivity);
 
-    const workspaceCol = board.createDiv({ cls: "ts-board-col ts-workspace-col" });
-    const wsCard = workspaceCol.createDiv({ cls: "ts-card ts-compact-card ts-workspaces-card" });
+    const maintenanceGrid = maintenanceCol.createDiv({ cls: "ts-maintenance-grid" });
+    const wsCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-workspaces-card" });
     wsCard.createDiv({ cls: "ts-card-label", text: "WORKSPACES" });
     this.renderWorkspaces(wsCard, wsStats);
 
-    const recentCol = board.createDiv({ cls: "ts-board-col ts-recent-col" });
-    const recCard = recentCol.createDiv({ cls: "ts-card ts-compact-card ts-recent-card" });
+    const recCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-recent-card" });
     recCard.createDiv({ cls: "ts-card-label", text: "RECENT" });
     this.renderRecent(recCard, recent);
 
-    const materialsCol = board.createDiv({ cls: "ts-board-col ts-materials-col" });
-    const materialsCard = materialsCol.createDiv({ cls: "ts-card ts-compact-card ts-materials-card" });
+    const materialsCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-materials-card" });
     materialsCard.createDiv({ cls: "ts-card-label", text: "MATERIALS" });
     this.renderProjectMaterialsCard(materialsCard, materials);
 
-    const productsCol = board.createDiv({ cls: "ts-board-col ts-products-col" });
-    const prodCard = productsCol.createDiv({ cls: "ts-card ts-compact-card ts-products-card" });
-    prodCard.createDiv({ cls: "ts-card-label", text: "PRODUCTS" });
+    const prodCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-products-card" });
+    prodCard.createDiv({ cls: "ts-card-label", text: "SYSTEM / INBOX" });
     this.renderProducts(prodCard, products, discovery, onboarding);
   }
 
