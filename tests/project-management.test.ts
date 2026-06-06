@@ -203,6 +203,38 @@ const managedWithoutStatusArchived = deriveManagedProjects({
 
 assert.equal(managedWithoutStatusArchived.length, 0);
 
+const legacyStatusMarkdown = `# Legacy 状态
+
+## 下一步
+- [ ] 整理旧项目状态
+`;
+const managedWithIndexLifecycle = deriveManagedProjects({
+  projects: [
+    {
+      id: "legacy-active",
+      name: "Legacy Active",
+      lifecycle: "active",
+      workspace: "04-项目/产品系统/Legacy Active",
+      status_note: "04-项目/产品系统/Legacy Active/项目状态.md",
+    },
+    {
+      id: "legacy-archived",
+      name: "Legacy Archived",
+      lifecycle: "archived",
+      workspace: "99-归档/完结项目/Legacy Archived",
+      status_note: "99-归档/完结项目/Legacy Archived/项目状态.md",
+    },
+  ],
+  statuses: new Map([
+    ["legacy-active", parseProjectStatusMarkdown(legacyStatusMarkdown, "legacy-active.md")],
+    ["legacy-archived", parseProjectStatusMarkdown(legacyStatusMarkdown, "legacy-archived.md")],
+  ]),
+  focusWeek: focus,
+  now: new Date("2026-06-05T12:00:00+08:00"),
+});
+
+assert.deepEqual(managedWithIndexLifecycle.map(project => [project.id, project.lifecycle]), [["legacy-active", "active"]]);
+
 const blockedPendingDecisionMarkdown = standardMarkdown
   .replace('project: "kora"', 'project: "blocked-decision"')
   .replace('priority: "P0"', 'priority: "P1"')

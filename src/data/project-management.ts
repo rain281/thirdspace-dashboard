@@ -29,6 +29,7 @@ export interface ParsedProjectStatus {
   priority: ProjectPriority;
   stage: ProjectStage;
   lifecycle: ManagedLifecycle;
+  hasLifecycle: boolean;
   updated: string;
   title: string;
   sections: Record<ProjectStatusSection, string> & {
@@ -61,6 +62,7 @@ export function parseProjectStatusMarkdown(markdown: string, path: string): Pars
     priority: normalizePriority(frontmatter.priority),
     stage: normalizeStage(frontmatter.stage),
     lifecycle: normalizeLifecycle(frontmatter.lifecycle),
+    hasLifecycle: typeof frontmatter.lifecycle === "string" && frontmatter.lifecycle.trim().length > 0,
     updated: scalar(frontmatter.updated),
     title,
     sections,
@@ -322,7 +324,7 @@ export function deriveManagedProjects(input: DeriveManagedProjectsInput): Manage
   return input.projects
     .flatMap(project => {
       const status = input.statuses.get(project.id);
-      const lifecycle = status?.lifecycle ?? normalizeLifecycle(project.lifecycle);
+      const lifecycle = status?.hasLifecycle ? status.lifecycle : normalizeLifecycle(project.lifecycle);
       if (lifecycle === "archived") return [];
       const focus = focusById.get(project.id);
       const managed: ManagedProject = {
