@@ -32,7 +32,7 @@ import {
   type ProjectMaterialsItem,
 } from "./data/project-materials";
 import { loadPortfolioModel } from "./data/project-management-reader";
-import type { PortfolioModel } from "./data/project-management";
+import { deriveTodayFocusCoverage, type PortfolioModel, type TodayFocusCoverage } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { renderPortfolio } from "./components/portfolio";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
@@ -192,10 +192,10 @@ export class DashboardView extends ItemView {
     refreshBtn.addEventListener("click", () => { this.snakeRouteCache = null; this.render(); });
 
     const board = contentEl.createDiv({ cls: `ts-board ts-board--${this.activePage}` });
+    const portfolio = await loadPortfolioModel(this.app);
     if (this.activePage === "today") {
-      this.renderTodayPage(board, todos, projectBacklog, todayWorklog);
+      this.renderTodayPage(board, todos, projectBacklog, todayWorklog, portfolio);
     } else {
-      const portfolio = await loadPortfolioModel(this.app);
       this.renderProjectsPage(board, portfolio, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
     this.renderPageSwitch(contentEl);
@@ -207,8 +207,10 @@ export class DashboardView extends ItemView {
     todos: TodoItem[],
     projectBacklog: ProjectBacklogItem[],
     todayWorklog: TodayWorklog | null,
+    portfolio: PortfolioModel,
   ) {
     const pending = todos.filter(t => !t.done);
+    const focusCoverage = deriveTodayFocusCoverage(portfolio, this.extractProjectNames(todayWorklog ?? this.emptyTodayWorklog()));
 
     const overviewCol = board.createDiv({ cls: "ts-board-col ts-overview-col" });
     const overviewCard = overviewCol.createDiv({ cls: "ts-card ts-compact-card ts-overview-card ts-next-action-card" });
@@ -224,7 +226,7 @@ export class DashboardView extends ItemView {
     const logHd   = logCard.createDiv({ cls: "ts-card-head" });
     logHd.createSpan({ cls: "ts-card-label", text: "TODAY" });
     logHd.createSpan({ cls: "ts-card-meta", text: new Date().toLocaleDateString("zh-CN",{month:"short",day:"numeric",weekday:"short"}) });
-    this.renderTodayWorklog(logCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog);
+    this.renderTodayWorklog(logCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog, focusCoverage);
 
     const todoCol = board.createDiv({ cls: "ts-board-col ts-todo-col" });
     const todoCard = todoCol.createDiv({ cls: "ts-card ts-compact-card ts-todo-card" });
@@ -754,7 +756,12 @@ export class DashboardView extends ItemView {
     return { highlights: [], todos: [], entries: [], outputs: [], events: [], timeline: [] };
   }
 
-  private renderTodayWorklog(parent: HTMLElement, today: TodayWorklog, missingLog = false) {
+  private renderTodayWorklog(
+    parent: HTMLElement,
+    today: TodayWorklog,
+    missingLog = false,
+    focusCoverage?: TodayFocusCoverage,
+  ) {
     const body = parent.createDiv({ cls: "ts-log-body ts-log-body--split" });
     const openToday = () => this.openTodayLog();
 
@@ -780,7 +787,7 @@ export class DashboardView extends ItemView {
 
     const metricsCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--metrics" });
     metricsCard.createDiv({ cls: "ts-today-subhead", text: "今日指标" });
-    this.renderTodayMetrics(metricsCard, today, missingLog);
+    this.renderTodayMetrics(metricsCard, today, missingLog, focusCoverage);
 
     const flowCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--flow" });
     const flowHead = flowCard.createDiv({ cls: "ts-today-subhead ts-timeline-head" });
@@ -801,7 +808,12 @@ export class DashboardView extends ItemView {
     }
   }
 
-  private renderTodayMetrics(parent: HTMLElement, today: TodayWorklog, missingLog = false) {
+  private renderTodayMetrics(
+    parent: HTMLElement,
+    today: TodayWorklog,
+    missingLog = false,
+    focusCoverage?: TodayFocusCoverage,
+  ) {
     const metrics = this.calculateTodayMetrics(today);
     const body = parent.createDiv({ cls: "ts-today-scroll ts-today-metrics-body" });
     const openToday = () => this.openTodayLog();
@@ -837,6 +849,48 @@ export class DashboardView extends ItemView {
     } else {
       focus.createDiv({ cls: "ts-today-focus-text", text: metrics.total > 0 ? "今日 Todo 已完成" : "暂无今日 Todo" });
     }
+
+    if (focusCoverage) this.renderTodayFocusCoverage(body, focusCoverage);
+  }
+
+  private renderTodayFocusCoverage(parent: HTMLElement, coverage: TodayFocusCoverage) {
+    const wrap = parent.createDiv({ cls: "ts-focus-coverage" });
+    const head = wrap.createDiv({ cls: "ts-focus-coverage-head" });
+    head.createSpan({ cls: "ts-focus-coverage-title", text: "本周 Focus" });
+    head.createSpan({
+      cls: "ts-focus-coverage-count",
+      text: coverage.totalFocus > 0 ? `${coverage.coveredCount}/${coverage.totalFocus}` : coverage.confirmationStatus,
+    });
+
+    if (coverage.totalFocus === 0) {
+      wrap.createDiv({
+        cls: "ts-empty ts-focus-coverage-empty",
+        text: coverage.confirmationStatus === "confirmed" ? "No weekly Focus set" : "Weekly Focus pending confirmation",
+      });
+      return;
+    }
+
+    const list = wrap.createDiv({ cls: "ts-focus-coverage-list" });
+    for (const project of coverage.focusProjects) {
+      const row = list.createDiv({
+        cls: `ts-focus-coverage-row ${project.covered ? "is-covered" : "is-missing"}`,
+      });
+      row.createSpan({ cls: "ts-focus-coverage-role", text: this.focusRoleLabel(project.role) });
+      row.createSpan({ cls: "ts-focus-coverage-name", text: project.name });
+      row.createSpan({ cls: "ts-focus-coverage-state", text: project.covered ? "covered" : "missing" });
+    }
+
+    if (coverage.offFocusProjects.length === 0) return;
+    const offFocus = wrap.createDiv({ cls: "ts-off-focus-row" });
+    offFocus.createSpan({ cls: "ts-off-focus-label", text: "OFF-FOCUS" });
+    const chips = offFocus.createSpan({ cls: "ts-off-focus-chips" });
+    for (const project of coverage.offFocusProjects) chips.createSpan({ cls: "ts-off-focus-chip", text: project });
+  }
+
+  private focusRoleLabel(role: "main" | "support" | "maintenance"): string {
+    if (role === "main") return "主";
+    if (role === "support") return "副";
+    return "维";
   }
 
   private calculateTodayMetrics(today: TodayWorklog): TodayMetrics {

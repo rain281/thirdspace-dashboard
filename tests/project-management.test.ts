@@ -3,9 +3,11 @@ import {
   currentIsoWeek,
   deriveManagedProjects,
   derivePortfolioSummary,
+  deriveTodayFocusCoverage,
   parseFocusWeekYaml,
   parseProjectStatusMarkdown,
   STANDARD_PROJECT_STATUS_SECTIONS,
+  type PortfolioModel,
   type ProjectIndexLike,
 } from "../src/data/project-management";
 
@@ -86,6 +88,7 @@ assert.ok(missing.missingSections.includes("目标"));
 assert.equal(STANDARD_PROJECT_STATUS_SECTIONS.includes("交付门禁"), true);
 
 const focus = parseFocusWeekYaml(`week: "2026-W23"
+confirmation_status: "confirmed"
 focus_limit: 3
 focus_projects:
   - id: "kora"
@@ -111,8 +114,47 @@ assert.equal(focus.focusProjects[0].id, "kora");
 assert.equal(focus.focusProjects[0].role, "main");
 assert.equal(focus.offFocusEvents[0].projectId, "aidv");
 assert.equal(focus.offFocusEvents[0].reason, "临时机会");
+assert.equal(focus.confirmationStatus, "confirmed");
+
+const pendingFocus = parseFocusWeekYaml(`week: "2026-W24"
+confirmation_status: "pending"
+focus_limit: 3
+focus_projects:
+  - id: "kora"
+    role: "main"
+    reason: "draft focus"
+off_focus_policy: "allow_today_with_reason"
+off_focus_events: []
+`);
+
+assert.equal(pendingFocus.week, "2026-W24");
+assert.equal(pendingFocus.confirmationStatus, "pending");
+assert.equal(pendingFocus.focusProjects.length, 0);
+
+const implicitPendingFocus = parseFocusWeekYaml(`week: "2026-W24"
+focus_projects:
+  - id: "pilot"
+    role: "support"
+    reason: "legacy draft"
+`);
+
+assert.equal(implicitPendingFocus.confirmationStatus, "pending");
+assert.equal(implicitPendingFocus.focusProjects.length, 0);
+
+const confirmedFocus = parseFocusWeekYaml(`week: "2026-W24"
+confirmation_status: "confirmed"
+focus_projects:
+  - id: "kora"
+    role: "main"
+    reason: "confirmed"
+`);
+
+assert.equal(confirmedFocus.confirmationStatus, "confirmed");
+assert.equal(confirmedFocus.focusProjects[0].id, "kora");
+assert.equal(confirmedFocus.focusProjects[0].role, "main");
 
 const fallbackFocus = parseFocusWeekYaml("");
+assert.equal(fallbackFocus.confirmationStatus, "pending");
 assert.equal(fallbackFocus.focusLimit, 3);
 assert.equal(fallbackFocus.focusProjects.length, 0);
 assert.match(currentIsoWeek(new Date("2026-06-05T12:00:00+08:00")), /^2026-W23$/);
@@ -180,6 +222,58 @@ assert.equal(summary.focusUsed, 2);
 assert.equal(summary.riskCount, 1);
 assert.equal(summary.noNextStepCount, 1);
 assert.equal(summary.staleCount, 1);
+
+const todayCoverageModel: PortfolioModel = {
+  focusWeek: {
+    ...focus,
+    week: "2026-W24",
+    focusProjects: [
+      { id: "kora", role: "main", reason: "confirmed" },
+      { id: "pilot", role: "support", reason: "confirmed" },
+      { id: "aidv", role: "maintenance", reason: "confirmed" },
+    ],
+  },
+  projects: [
+    { ...managed[0], id: "kora", name: "Kora", focusRole: "main" },
+    { ...managed[1], id: "pilot", name: "Pilot", focusRole: "support" },
+    { ...managed[1], id: "aidv", name: "AIDV", focusRole: "maintenance" },
+    { ...managed[1], id: "comic-drama", name: "AI漫剧", focusRole: null },
+  ],
+  summary: {
+    ...summary,
+    focusUsed: 3,
+    focusLimit: 3,
+  },
+};
+
+const todayFocusCoverage = deriveTodayFocusCoverage(todayCoverageModel, new Set(["Kora", "AI漫剧"]));
+
+assert.deepEqual(todayFocusCoverage.focusProjects.map(item => [item.name, item.role, item.covered]), [
+  ["Kora", "main", true],
+  ["Pilot", "support", false],
+  ["AIDV", "maintenance", false],
+]);
+assert.deepEqual(todayFocusCoverage.offFocusProjects, ["AI漫剧"]);
+assert.equal(todayFocusCoverage.coveredCount, 1);
+assert.equal(todayFocusCoverage.totalFocus, 3);
+assert.equal(todayFocusCoverage.confirmationStatus, "confirmed");
+
+const pendingTodayFocusCoverage = deriveTodayFocusCoverage(
+  {
+    ...todayCoverageModel,
+    focusWeek: {
+      ...todayCoverageModel.focusWeek,
+      confirmationStatus: "pending",
+      focusProjects: [],
+    },
+    projects: todayCoverageModel.projects.map(project => ({ ...project, focusRole: null })),
+  },
+  new Set(["Kora"]),
+);
+
+assert.equal(pendingTodayFocusCoverage.confirmationStatus, "pending");
+assert.equal(pendingTodayFocusCoverage.totalFocus, 0);
+assert.deepEqual(pendingTodayFocusCoverage.offFocusProjects, []);
 
 const statusArchivedMarkdown = standardMarkdown
   .replace('project: "kora"', 'project: "archived-in-status"')
