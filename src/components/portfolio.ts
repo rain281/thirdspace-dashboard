@@ -170,5 +170,7 @@ function healthClass(status: ProjectHealthStatus): string {
 }
 
 function emptyPortfolioText(model: PortfolioModel): string {
-  return model.projects.length === 0 ? "No managed Portfolio projects" : "No weekly Focus set";
+  if (model.projects.length === 0) return "No managed Portfolio projects";
+  if (model.focusWeek.confirmationStatus !== "confirmed") return "Weekly Focus pending confirmation";
+  return "No weekly Focus set";
 }

@@ -53,6 +53,7 @@ class FakeElement {
 const populatedPortfolio: PortfolioModel = {
   focusWeek: {
     week: "2026-W23",
+    confirmationStatus: "confirmed",
     focusLimit: 3,
     focusProjects: [{ id: "kora", role: "main", reason: "P0 main" }],
     offFocusPolicy: "allow_today_with_reason",
@@ -153,7 +154,7 @@ const emptyParent = new FakeElement();
 renderPortfolio(
   emptyParent as unknown as HTMLElement,
   {
-    focusWeek: { week: "2026-W23", focusLimit: 3, focusProjects: [], offFocusPolicy: "allow_today_with_reason", offFocusEvents: [] },
+    focusWeek: { week: "2026-W23", confirmationStatus: "confirmed", focusLimit: 3, focusProjects: [], offFocusPolicy: "allow_today_with_reason", offFocusEvents: [] },
     summary: {
       totalManaged: 0,
       activeCount: 0,
@@ -173,3 +174,25 @@ renderPortfolio(
 );
 
 assert.match(emptyParent.textContent(), /No managed Portfolio projects/);
+
+const pendingFocusParent = new FakeElement();
+renderPortfolio(
+  pendingFocusParent as unknown as HTMLElement,
+  {
+    ...populatedPortfolio,
+    focusWeek: {
+      ...populatedPortfolio.focusWeek,
+      confirmationStatus: "pending",
+      focusProjects: [],
+    },
+    projects: populatedPortfolio.projects.map(project => ({ ...project, focusRole: null })),
+    summary: {
+      ...populatedPortfolio.summary,
+      focusUsed: 0,
+    },
+  },
+  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
+  { openFile: () => undefined },
+);
+
+assert.match(pendingFocusParent.textContent(), /Weekly Focus pending confirmation/);

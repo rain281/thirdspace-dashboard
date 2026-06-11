@@ -153,6 +153,7 @@ export interface OffFocusEvent {
 
 export interface FocusWeek {
   week: string;
+  confirmationStatus: "pending" | "confirmed";
   focusLimit: number;
   focusProjects: FocusProject[];
   offFocusPolicy: string;
@@ -165,6 +166,7 @@ export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek
   const focusProjects: FocusProject[] = [];
   const offFocusEvents: OffFocusEvent[] = [];
   let week = "";
+  let confirmationStatus: FocusWeek["confirmationStatus"] = "pending";
   let focusLimit = 3;
   let offFocusPolicy = "allow_today_with_reason";
   let list: "focus" | "off-focus" | "" = "";
@@ -197,6 +199,7 @@ export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
     if (line.startsWith("week:")) week = yamlScalar(line.replace("week:", ""));
+    else if (line.startsWith("confirmation_status:")) confirmationStatus = normalizeConfirmationStatus(yamlScalar(line.replace("confirmation_status:", "")));
     else if (line.startsWith("focus_limit:")) focusLimit = Number(yamlScalar(line.replace("focus_limit:", ""))) || 3;
     else if (line.startsWith("off_focus_policy:")) offFocusPolicy = yamlScalar(line.replace("off_focus_policy:", ""));
     else if (line === "focus_projects:") { flushOffFocus(); list = "focus"; }
@@ -221,8 +224,9 @@ export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek
 
   return {
     week: week || currentIsoWeek(now),
+    confirmationStatus,
     focusLimit,
-    focusProjects,
+    focusProjects: confirmationStatus === "confirmed" ? focusProjects : [],
     offFocusPolicy,
     offFocusEvents,
   };
@@ -240,6 +244,7 @@ export function currentIsoWeek(date = new Date()): string {
 function emptyFocusWeek(now: Date): FocusWeek {
   return {
     week: currentIsoWeek(now),
+    confirmationStatus: "pending",
     focusLimit: 3,
     focusProjects: [],
     offFocusPolicy: "allow_today_with_reason",
@@ -250,6 +255,10 @@ function emptyFocusWeek(now: Date): FocusWeek {
 function normalizeFocusRole(value: string): FocusRole {
   if (value === "main" || value === "support" || value === "maintenance") return value;
   return "support";
+}
+
+function normalizeConfirmationStatus(value: string): FocusWeek["confirmationStatus"] {
+  return value === "confirmed" ? "confirmed" : "pending";
 }
 
 function yamlScalar(value: string): string {
@@ -438,4 +447,67 @@ export interface PortfolioModel {
   focusWeek: FocusWeek;
   projects: ManagedProject[];
   summary: PortfolioSummary;
+}
+
+export interface TodayFocusProject {
+  id: string;
+  name: string;
+  role: FocusRole;
+  covered: boolean;
+}
+
+export interface TodayFocusCoverage {
+  confirmationStatus: FocusWeek["confirmationStatus"];
+  coveredCount: number;
+  totalFocus: number;
+  focusProjects: TodayFocusProject[];
+  offFocusProjects: string[];
+}
+
+export function deriveTodayFocusCoverage(model: PortfolioModel, todayProjectNames: Set<string>): TodayFocusCoverage {
+  if (model.focusWeek.confirmationStatus !== "confirmed") {
+    return {
+      confirmationStatus: model.focusWeek.confirmationStatus,
+      coveredCount: 0,
+      totalFocus: 0,
+      focusProjects: [],
+      offFocusProjects: [],
+    };
+  }
+
+  const mentioned = new Set(Array.from(todayProjectNames, normalizeProjectKey).filter(Boolean));
+  const focusProjects = model.projects
+    .filter(project => project.focusRole)
+    .map(project => ({
+      id: project.id,
+      name: project.name,
+      role: project.focusRole as FocusRole,
+      covered: mentioned.has(normalizeProjectKey(project.id)) || mentioned.has(normalizeProjectKey(project.name)),
+    }));
+  const focusKeys = new Set(focusProjects.flatMap(project => [normalizeProjectKey(project.id), normalizeProjectKey(project.name)]));
+  const managedByKey = new Map<string, ManagedProject>();
+  for (const project of model.projects) {
+    managedByKey.set(normalizeProjectKey(project.id), project);
+    managedByKey.set(normalizeProjectKey(project.name), project);
+  }
+
+  const offFocusProjects = Array.from(todayProjectNames)
+    .map(name => {
+      const key = normalizeProjectKey(name);
+      if (!key || focusKeys.has(key)) return "";
+      return managedByKey.get(key)?.name ?? "";
+    })
+    .filter(Boolean);
+
+  return {
+    confirmationStatus: model.focusWeek.confirmationStatus,
+    coveredCount: focusProjects.filter(project => project.covered).length,
+    totalFocus: focusProjects.length,
+    focusProjects,
+    offFocusProjects: Array.from(new Set(offFocusProjects)),
+  };
+}
+
+function normalizeProjectKey(value: string): string {
+  return value.trim().toLowerCase();
 }
