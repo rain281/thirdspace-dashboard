@@ -2,6 +2,9 @@ import type { ManagedProject, PortfolioModel, ProjectHealthStatus } from "../dat
 
 export interface PortfolioActions {
   openFile(path: string): void;
+  openWorkspace?(path: string): void;
+  selectProject?(projectId: string): void;
+  selectedProjectId?: string | null;
 }
 
 export interface MaintenanceCounts {
@@ -23,6 +26,7 @@ export function renderPortfolio(
   renderFocusSuggestions(shell, model, actions);
   renderRiskDecisionQueue(shell, model, actions);
   renderPriorityProjects(shell, model, actions);
+  renderProjectDetail(shell, model, actions);
   renderMaintenanceStrip(shell, maintenance);
 }
 
@@ -120,7 +124,7 @@ function renderMaintenanceStrip(parent: HTMLElement, counts: MaintenanceCounts):
 
 function renderProjectCard(parent: HTMLElement, project: ManagedProject, actions: PortfolioActions, focusCard: boolean): void {
   const row = parent.createDiv({
-    cls: `ts-project-card ts-health--${healthClass(project.health.status)}${focusCard ? " ts-project-card--focus" : ""}`,
+    cls: `ts-project-card ts-health--${healthClass(project.health.status)}${focusCard ? " ts-project-card--focus" : ""}${actions.selectedProjectId === project.id ? " is-selected" : ""}`,
   });
   bindOpen(row, project, actions);
   const top = row.createDiv({ cls: "ts-project-card-top" });
@@ -137,6 +141,89 @@ function renderProjectCard(parent: HTMLElement, project: ManagedProject, actions
   renderProjectQueue(row, "gate", project.deliveryGates);
 }
 
+function renderProjectDetail(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
+  const selected = selectedProject(model, actions.selectedProjectId);
+  const card = parent.createDiv({ cls: "ts-card ts-project-detail-card" });
+  const head = card.createDiv({ cls: "ts-card-head" });
+  head.createSpan({ cls: "ts-card-label", text: "PROJECT DETAIL" });
+  head.createSpan({ cls: "ts-card-meta", text: selected ? [selected.priority, selected.stage, selected.lifecycle].join(" · ") : "No project" });
+
+  if (!selected) {
+    card.createDiv({ cls: "ts-empty", text: "No project selected" });
+    return;
+  }
+
+  const hero = card.createDiv({ cls: `ts-detail-hero ts-health--${healthClass(selected.health.status)}` });
+  hero.createDiv({ cls: "ts-detail-title", text: selected.name });
+  hero.createDiv({ cls: "ts-detail-health", text: [selected.health.status, ...selected.health.reasons.slice(0, 3)].join(" · ") });
+
+  const grid = card.createDiv({ cls: "ts-detail-grid" });
+  detailSection(grid, "Goal", selected.goal);
+  detailSection(grid, "Success", selected.successCriteria);
+  detailSection(grid, "Milestone", selected.milestone);
+  detailSection(grid, "Gates", selected.deliveryGates);
+  detailSection(grid, "Next Step", selected.nextStep);
+  detailSection(grid, "Risks", selected.risks);
+  detailSection(grid, "Decisions", selected.pendingDecisions);
+  detailSection(grid, "Recent Status", selected.recentStatus);
+
+  renderContextReadiness(grid, selected);
+  renderQuickLinks(grid, selected, actions);
+}
+
+function selectedProject(model: PortfolioModel, selectedProjectId: string | null | undefined): ManagedProject | null {
+  return model.projects.find(project => project.id === selectedProjectId)
+    ?? model.projects.find(project => project.focusRole === "main")
+    ?? model.projects.find(project => project.focusRole)
+    ?? model.projects[0]
+    ?? null;
+}
+
+function detailSection(parent: HTMLElement, label: string, markdown: string): void {
+  const section = parent.createDiv({ cls: "ts-detail-section" });
+  section.createDiv({ cls: "ts-detail-section-label", text: label });
+  section.createDiv({ cls: "ts-detail-section-text", text: compact(markdown) || "—" });
+}
+
+function renderContextReadiness(parent: HTMLElement, project: ManagedProject): void {
+  const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--readiness" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "Context Readiness" });
+  const row = section.createDiv({ cls: "ts-detail-readiness" });
+  readinessChip(row, "首页", Boolean(project.projectHome));
+  readinessChip(row, "状态", Boolean(project.statusNote));
+  readinessChip(row, "上下文", Boolean(project.codexContext));
+  readinessChip(row, "仓库", Boolean(project.repoPath));
+}
+
+function readinessChip(parent: HTMLElement, label: string, ok: boolean): void {
+  parent.createSpan({ cls: `ts-detail-readiness-chip ${ok ? "is-ready" : "is-missing"}`, text: label });
+}
+
+function renderQuickLinks(parent: HTMLElement, project: ManagedProject, actions: PortfolioActions): void {
+  const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--links" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "Quick Links" });
+  const links = section.createDiv({ cls: "ts-detail-links" });
+  quickLink(links, "状态笔记", project.statusNote, actions);
+  quickLink(links, "首页", project.projectHome, actions);
+  quickLink(links, "上下文", project.codexContext, actions);
+  quickLink(links, "工作区", project.workspace, actions, Boolean(actions.openWorkspace), path => actions.openWorkspace?.(path));
+  quickLink(links, "仓库", project.repoPath, actions, false);
+}
+
+function quickLink(
+  parent: HTMLElement,
+  label: string,
+  path: string,
+  actions: PortfolioActions,
+  openable = true,
+  handler?: (path: string) => void,
+): void {
+  const row = parent.createDiv({ cls: `ts-detail-link-row${openable && path ? " is-openable" : ""}` });
+  row.createSpan({ cls: "ts-detail-link-label", text: label });
+  row.createSpan({ cls: "ts-detail-link-path", text: path || "—" });
+  if (openable && path) row.addEventListener("click", () => handler ? handler(path) : actions.openFile(path));
+}
+
 function renderProjectQueue(parent: HTMLElement, label: string, markdown: string): void {
   const text = compact(markdown);
   if (!text) return;
@@ -151,6 +238,10 @@ function metric(parent: HTMLElement, value: string, label: string): void {
 
 function bindOpen(element: HTMLElement, project: ManagedProject, actions: PortfolioActions): void {
   element.addEventListener("click", () => {
+    if (actions.selectProject) {
+      actions.selectProject(project.id);
+      return;
+    }
     const path = project.statusNote || project.projectHome;
     if (path) actions.openFile(path);
   });

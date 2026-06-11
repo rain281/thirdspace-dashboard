@@ -44,6 +44,22 @@ class FakeElement {
     return null;
   }
 
+  findAllByClass(cls: string): FakeElement[] {
+    return [
+      ...(this.cls.split(/\s+/).includes(cls) ? [this] : []),
+      ...this.children.flatMap(child => child.findAllByClass(cls)),
+    ];
+  }
+
+  findByText(pattern: RegExp): FakeElement | null {
+    if (pattern.test(this.textContent())) return this;
+    for (const child of this.children) {
+      const found = child.findByText(pattern);
+      if (found) return found;
+    }
+    return null;
+  }
+
   private append(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
@@ -196,3 +212,52 @@ renderPortfolio(
 );
 
 assert.match(pendingFocusParent.textContent(), /Weekly Focus pending confirmation/);
+
+const selected: string[] = [];
+const detailOpened: string[] = [];
+const workspaceOpened: string[] = [];
+const detailParent = new FakeElement();
+renderPortfolio(
+  detailParent as unknown as HTMLElement,
+  populatedPortfolio,
+  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
+  {
+    selectedProjectId: "kora",
+    selectProject: id => selected.push(id),
+    openFile: path => detailOpened.push(path),
+    openWorkspace: path => workspaceOpened.push(path),
+  },
+);
+
+const detailText = detailParent.textContent();
+assert.match(detailText, /PROJECT DETAIL/);
+assert.match(detailText, /Kora/);
+assert.match(detailText, /Goal/);
+assert.match(detailText, /构建本地工作台/);
+assert.match(detailText, /Success/);
+assert.match(detailText, /能判断今日推进事项/);
+assert.match(detailText, /Milestone/);
+assert.match(detailText, /M2 Portfolio/);
+assert.match(detailText, /Next Step/);
+assert.match(detailText, /完成只读 Portfolio/);
+assert.match(detailText, /Quick Links/);
+assert.match(detailText, /状态笔记/);
+assert.match(detailText, /首页/);
+assert.match(detailText, /上下文/);
+assert.match(detailText, /仓库/);
+
+detailParent.findByClass("ts-project-card")?.click();
+assert.deepEqual(selected, ["kora"]);
+assert.deepEqual(detailOpened, []);
+
+detailParent
+  .findAllByClass("ts-detail-link-row")
+  .find(element => /状态笔记/.test(element.textContent()))
+  ?.click();
+assert.deepEqual(detailOpened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
+
+detailParent
+  .findAllByClass("ts-detail-link-row")
+  .find(element => /工作区/.test(element.textContent()))
+  ?.click();
+assert.deepEqual(workspaceOpened, ["04-项目/产品系统/Kora"]);

@@ -107,6 +107,7 @@ export class DashboardView extends ItemView {
   private archivingStaleTodos = false;
   private activePage: DashboardPage = "today";
   private timelineFilter: TimelineFilter = "all";
+  private selectedProjectId: string | null = null;
   private snakeRouteCache: SnakeRouteCache | null = null;
   private snakeReplayTimer: number | null = null;
   private readonly singleScreenLimit = {
@@ -278,7 +279,13 @@ export class DashboardView extends ItemView {
         recentCount: recent.length,
       },
       {
+        selectedProjectId: this.selectedProjectId,
+        selectProject: projectId => {
+          this.selectedProjectId = projectId;
+          void this.render();
+        },
         openFile: path => this.openFile(path),
+        openWorkspace: path => this.openWorkspace(path),
       },
     );
 

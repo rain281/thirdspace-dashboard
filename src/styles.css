@@ -468,11 +468,12 @@
   height: 100%;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, .85fr) minmax(0, .85fr) minmax(130px, .8fr);
   grid-template-areas:
     "health health health health health health"
     "focus focus focus suggestions suggestions suggestions"
-    "risk risk priority priority system system";
+    "risk risk priority priority system system"
+    "detail detail detail detail detail detail";
   gap: 8px;
   overflow: hidden;
 }
@@ -483,13 +484,15 @@
 .ts-risk-queue-card { grid-area: risk; }
 .ts-priority-card { grid-area: priority; }
 .ts-maintenance-strip { grid-area: system; }
+.ts-project-detail-card { grid-area: detail; }
 
 .ts-portfolio-health-card,
 .ts-weekly-focus-card,
 .ts-focus-suggestions-card,
 .ts-risk-queue-card,
 .ts-priority-card,
-.ts-maintenance-strip {
+.ts-maintenance-strip,
+.ts-project-detail-card {
   display: flex;
   flex-direction: column;
 }
@@ -568,6 +571,11 @@
   transform: translateY(-1px);
   border-color: var(--ts-border-strong);
   background: color-mix(in srgb, var(--ts-accent) 8%, var(--ts-panel) 92%);
+}
+
+.ts-project-card.is-selected {
+  border-color: color-mix(in srgb, var(--ts-accent) 45%, var(--ts-border) 55%);
+  background: color-mix(in srgb, var(--ts-accent) 10%, var(--background-primary) 90%);
 }
 
 .ts-project-card-top {
@@ -650,6 +658,162 @@
 
 .ts-health--healthy .ts-project-health {
   color: color-mix(in srgb, var(--ts-green) 76%, var(--ts-text) 24%);
+}
+
+.ts-detail-hero {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 80%, var(--ts-panel) 20%);
+}
+
+.ts-detail-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-size: 12px;
+  line-height: 1.15;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-detail-health {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-2);
+  font-size: 9.5px;
+  line-height: 1.15;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-detail-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 8px;
+  margin-top: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ts-detail-section {
+  min-width: 0;
+}
+
+.ts-detail-section--readiness,
+.ts-detail-section--links {
+  grid-column: span 2;
+}
+
+.ts-detail-section-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 820;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-detail-section-text {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--ts-text);
+  font-size: 9.5px;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-detail-readiness,
+.ts-detail-links {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.ts-detail-readiness-chip {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: 999px;
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.05;
+  font-weight: 750;
+}
+
+.ts-detail-readiness-chip.is-ready {
+  border-color: color-mix(in srgb, var(--ts-green) 30%, var(--ts-border) 70%);
+  color: color-mix(in srgb, var(--ts-green) 76%, var(--ts-text) 24%);
+}
+
+.ts-detail-readiness-chip.is-missing {
+  border-color: color-mix(in srgb, var(--ts-yellow) 34%, var(--ts-border) 66%);
+  color: color-mix(in srgb, var(--ts-yellow) 78%, var(--ts-text) 22%);
+}
+
+.ts-detail-links {
+  gap: 5px;
+}
+
+.ts-detail-link-row {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  color: var(--ts-text-2);
+  background: color-mix(in srgb, var(--background-primary) 82%, var(--ts-panel) 18%);
+}
+
+.ts-detail-link-row.is-openable {
+  cursor: pointer;
+}
+
+.ts-detail-link-row.is-openable:hover {
+  border-color: var(--ts-border-strong);
+  color: var(--ts-accent);
+  background: color-mix(in srgb, var(--ts-accent) 9%, var(--background-primary) 91%);
+}
+
+.ts-detail-link-label {
+  flex: 0 0 auto;
+  font-size: 8.5px;
+  line-height: 1.1;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ts-detail-link-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 8px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ts-maintenance-grid {
@@ -3161,14 +3325,19 @@ body.theme-dark .ts-dash {
 
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto auto;
     grid-template-areas:
       "health health"
       "focus focus"
       "suggestions suggestions"
       "risk priority"
+      "detail detail"
       "system system";
     overflow-y: auto;
+  }
+
+  .ts-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ts-portfolio-metrics {
@@ -3200,14 +3369,19 @@ body.theme-dark .ts-dash {
 
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto auto;
     grid-template-areas:
       "health health"
       "focus focus"
       "suggestions suggestions"
       "risk priority"
+      "detail detail"
       "system system";
     overflow-y: auto;
+  }
+
+  .ts-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ts-portfolio-metrics {
@@ -3250,14 +3424,29 @@ body.theme-dark .ts-dash {
 
   .ts-portfolio {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto auto;
     grid-template-areas:
       "health"
       "focus"
       "suggestions"
       "risk"
       "priority"
+      "detail"
       "system";
+  }
+
+  .ts-detail-grid,
+  .ts-detail-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .ts-detail-health {
+    text-align: left;
+  }
+
+  .ts-detail-section--readiness,
+  .ts-detail-section--links {
+    grid-column: auto;
   }
 
   .ts-portfolio-metrics,
