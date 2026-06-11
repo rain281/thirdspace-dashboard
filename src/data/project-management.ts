@@ -184,6 +184,16 @@ export interface FocusConfirmationPreviews {
   weeklyPlan: ControlledWritePreview;
 }
 
+export interface WriteConsistencyIssue {
+  label: string;
+  detail: string;
+}
+
+export interface WriteConsistencyInput {
+  portfolio: PortfolioModel;
+  weeklyPlanContent: string;
+}
+
 export type ProjectDetailAction = "next-step" | "risk" | "decision";
 
 export interface ProjectDetailActionPreviewInput {
@@ -320,6 +330,38 @@ export function createProjectDetailActionPreview(input: ProjectDetailActionPrevi
       "不会修改归档项目，也不会写入代码仓库文件。",
     ],
   });
+}
+
+export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): WriteConsistencyIssue[] {
+  const issues: WriteConsistencyIssue[] = [];
+  const { portfolio, weeklyPlanContent } = input;
+  if (portfolio.focusWeek.confirmationStatus === "confirmed" && portfolio.focusWeek.focusProjects.length > 0) {
+    const missingMirror = portfolio.focusWeek.focusProjects.some(project => !weeklyPlanContent.includes(project.id))
+      || !weeklyPlanContent.includes("thirdspace-dashboard:start weekly-focus");
+    if (missingMirror) {
+      issues.push({
+        label: "Focus YAML 与周计划不一致",
+        detail: `${portfolio.focusWeek.week} 缺 Dashboard Focus 镜像`,
+      });
+    }
+  }
+  if (!weeklyPlanContent.includes("## 复盘") || !weeklyPlanContent.includes("thirdspace-dashboard:start weekly-review")) {
+    issues.push({
+      label: "周计划缺复盘",
+      detail: portfolio.focusWeek.week,
+    });
+  }
+  const missingStatusProjects = portfolio.projects
+    .filter(project => project.lifecycle !== "archived")
+    .filter(project => !project.nextStep.trim() || !project.pendingDecisions.trim())
+    .map(project => project.name);
+  if (missingStatusProjects.length > 0) {
+    issues.push({
+      label: "项目状态缺标准 section",
+      detail: missingStatusProjects.slice(0, 3).join(" / "),
+    });
+  }
+  return issues;
 }
 
 export function focusWeeklyPlanPath(week: string): string {

@@ -37,6 +37,7 @@ import {
   deriveTodayFocusCoverage,
   createFocusConfirmationPreviews,
   createProjectDetailActionPreview,
+  deriveWriteConsistencyIssues,
   focusWeeklyPlanPath,
   FOCUS_WEEK_PATH,
   nextIsoWeek,
@@ -305,7 +306,8 @@ export class DashboardView extends ItemView {
     } else if (this.activePage === "review") {
       this.renderReviewPage(board, portfolio, weeklyWorklogs);
     } else {
-      this.renderSystemPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
+      const weeklyPlanContent = await this.app.vault.adapter.read(focusWeeklyPlanPath(portfolio.focusWeek.week)).catch(() => "");
+      this.renderSystemPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials, portfolio, weeklyPlanContent);
     }
     this.renderPageSwitch(contentEl);
 
@@ -428,6 +430,8 @@ export class DashboardView extends ItemView {
     discovery: ProjectDiscoverySummary,
     onboarding: ProjectOnboardingItem[],
     materials: ProjectMaterialsItem[],
+    portfolio: PortfolioModel,
+    weeklyPlanContent: string,
   ) {
     const healthCol = board.createDiv({ cls: "ts-board-col ts-system-health-col" });
     renderSystemHealth(healthCol, {
@@ -437,6 +441,7 @@ export class DashboardView extends ItemView {
       recentCount: recent.length,
       workspaceCount: wsStats.length,
       gitRepoCount: gitActivity.repos.length,
+      writeConsistencyIssues: deriveWriteConsistencyIssues({ portfolio, weeklyPlanContent }),
     });
 
     const activityCol = board.createDiv({ cls: "ts-board-col ts-system-activity-col" });

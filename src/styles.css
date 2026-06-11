@@ -1068,6 +1068,43 @@
   background: color-mix(in srgb, var(--background-primary) 82%, var(--ts-panel) 18%);
 }
 
+.ts-system-health-issues {
+  min-height: 0;
+  margin-top: 8px;
+  overflow: auto;
+  display: grid;
+  gap: 5px;
+}
+
+.ts-system-health-issue {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--ts-yellow) 10%, transparent 90%);
+}
+
+.ts-system-health-issue-title,
+.ts-system-health-issue-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-system-health-issue-title {
+  color: var(--ts-text);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.ts-system-health-issue-detail {
+  margin-top: 2px;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 8.5px;
+}
+
 .ts-system-health-value {
   min-width: 0;
   overflow: hidden;

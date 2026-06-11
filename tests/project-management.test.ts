@@ -3,6 +3,7 @@ import {
   currentIsoWeek,
   createFocusConfirmationPreviews,
   createProjectDetailActionPreview,
+  deriveWriteConsistencyIssues,
   deriveManagedProjects,
   derivePortfolioSummary,
   deriveTodayFocusCoverage,
@@ -403,6 +404,31 @@ const managedWithIndexLifecycle = deriveManagedProjects({
 });
 
 assert.deepEqual(managedWithIndexLifecycle.map(project => [project.id, project.lifecycle]), [["legacy-active", "active"]]);
+
+const writeConsistencyIssues = deriveWriteConsistencyIssues({
+  portfolio: {
+    focusWeek: {
+      week: "2026-W25",
+      confirmationStatus: "confirmed",
+      focusLimit: 3,
+      focusProjects: [{ id: "kora", role: "main", reason: "confirmed" }],
+      offFocusPolicy: "allow_today_with_reason",
+      offFocusEvents: [],
+    },
+    projects: [
+      { ...managed[0], id: "kora", name: "Kora", focusRole: "main" },
+      { ...managed[1], id: "pilot", name: "Pilot", focusRole: null, nextStep: "", pendingDecisions: "" },
+    ],
+    summary,
+  },
+  weeklyPlanContent: "# 2026-W25 周计划\n\n## 本周 Focus\n\n手写内容\n",
+});
+
+assert.deepEqual(writeConsistencyIssues.map(issue => issue.label), [
+  "Focus YAML 与周计划不一致",
+  "周计划缺复盘",
+  "项目状态缺标准 section",
+]);
 
 const blockedPendingDecisionMarkdown = standardMarkdown
   .replace('project: "kora"', 'project: "blocked-decision"')
