@@ -1,3 +1,4 @@
+import { createFocusYamlPreview, createManagedSectionPreview, type ControlledWritePreview } from "./controlled-write";
 import type { ProjectBacklogItem, TimelineItem, TodayWorklog } from "./vault-reader";
 
 export const STANDARD_PROJECT_STATUS_SECTIONS = [
@@ -162,6 +163,27 @@ export interface FocusWeek {
   offFocusEvents: OffFocusEvent[];
 }
 
+export interface FocusConfirmationProject {
+  id: string;
+  name: string;
+  priority: ProjectPriority;
+  lifecycle: ManagedLifecycle;
+  health: ProjectHealth;
+}
+
+export interface FocusConfirmationPreviewInput {
+  week: string;
+  projects: FocusConfirmationProject[];
+  existingFocusYaml: string;
+  existingWeeklyPlan: string;
+}
+
+export interface FocusConfirmationPreviews {
+  focusProjects: FocusProject[];
+  yaml: ControlledWritePreview;
+  weeklyPlan: ControlledWritePreview;
+}
+
 export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek {
   if (!content.trim()) return emptyFocusWeek(now);
   const lines = content.split("\n");
@@ -234,6 +256,54 @@ export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek
   };
 }
 
+export function createFocusConfirmationPreviews(input: FocusConfirmationPreviewInput): FocusConfirmationPreviews {
+  const candidates = input.projects
+    .filter(project => project.lifecycle !== "archived" && project.lifecycle !== "paused")
+    .sort(compareFocusConfirmationProjects)
+    .slice(0, 3);
+  const roles: FocusRole[] = ["main", "support", "maintenance"];
+  const focusProjects = candidates.map((project, index) => ({
+    id: project.id,
+    role: roles[index],
+    reason: focusReason(project),
+  }));
+
+  const yaml = createFocusYamlPreview({
+    path: FOCUS_WEEK_PATH,
+    title: "确认下周 Focus",
+    existingContent: input.existingFocusYaml,
+    yaml: formatFocusWeekYaml(input.week, focusProjects),
+    warnings: [
+      "Focus 上限为 3；本次不会写入 archived 或 paused 项目。",
+      "确认后会先写入 focus-week YAML，再通过下一次预览写入周计划镜像。",
+    ],
+  });
+
+  const weeklyPlan = createManagedSectionPreview({
+    path: focusWeeklyPlanPath(input.week),
+    title: "写入周计划 Focus 镜像",
+    section: "本周 Focus",
+    marker: "weekly-focus",
+    existingContent: input.existingWeeklyPlan || focusWeeklyPlanSkeleton(input.week),
+    content: formatFocusWeeklyPlanMirror(input.week, candidates, focusProjects),
+    warnings: [
+      "只会替换 ## 本周 Focus 中的 Dashboard managed block，不覆盖手写计划。",
+      "这是 focus-week YAML 的人类可读镜像。",
+    ],
+  });
+
+  return { focusProjects, yaml, weeklyPlan };
+}
+
+export function focusWeeklyPlanPath(week: string): string {
+  return `02-日记/周计划/${week}_周计划.md`;
+}
+
+export function nextIsoWeek(date = new Date()): string {
+  const next = new Date(date.getTime() + 7 * 86400000);
+  return currentIsoWeek(next);
+}
+
 export function currentIsoWeek(date = new Date()): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;
@@ -265,6 +335,69 @@ function normalizeConfirmationStatus(value: string): FocusWeek["confirmationStat
 
 function yamlScalar(value: string): string {
   return value.trim().replace(/^["']|["']$/g, "");
+}
+
+function compareFocusConfirmationProjects(a: FocusConfirmationProject, b: FocusConfirmationProject): number {
+  return priorityRank(a.priority) - priorityRank(b.priority)
+    || healthRank(a.health.status) - healthRank(b.health.status)
+    || a.name.localeCompare(b.name);
+}
+
+function healthRank(status: ProjectHealthStatus): number {
+  if (status === "风险") return 0;
+  if (status === "注意") return 1;
+  return 2;
+}
+
+function focusReason(project: FocusConfirmationProject): string {
+  const health = project.health.reasons.slice(0, 2).join("、") || project.health.status;
+  return `${project.priority} · ${health}`;
+}
+
+function formatFocusWeekYaml(week: string, focusProjects: FocusProject[]): string {
+  return [
+    `week: "${week}"`,
+    `confirmation_status: "confirmed"`,
+    "focus_limit: 3",
+    "focus_projects:",
+    ...focusProjects.flatMap(project => [
+      `  - id: "${escapeYaml(project.id)}"`,
+      `    role: "${project.role}"`,
+      `    reason: "${escapeYaml(project.reason)}"`,
+    ]),
+    `off_focus_policy: "allow_today_with_reason"`,
+    "off_focus_events: []",
+  ].join("\n");
+}
+
+function formatFocusWeeklyPlanMirror(
+  week: string,
+  projects: FocusConfirmationProject[],
+  focusProjects: FocusProject[],
+): string {
+  const byId = new Map(projects.map(project => [project.id, project]));
+  return [
+    `### Dashboard Focus 镜像 · ${week}`,
+    "",
+    ...focusProjects.map(project => {
+      const source = byId.get(project.id);
+      return `- ${source?.name ?? project.id}：${focusRoleLabelZh(project.role)} · ${project.reason}`;
+    }),
+  ].join("\n");
+}
+
+function focusWeeklyPlanSkeleton(week: string): string {
+  return [`# ${week} 周计划`, "", "## 本周 Focus", ""].join("\n");
+}
+
+function escapeYaml(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function focusRoleLabelZh(role: FocusRole): string {
+  if (role === "main") return "主项目";
+  if (role === "support") return "副项目";
+  return "维护项目";
 }
 
 export interface ProjectIndexLike {

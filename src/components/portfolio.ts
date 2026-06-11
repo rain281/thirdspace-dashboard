@@ -4,6 +4,7 @@ export interface PortfolioActions {
   openFile(path: string): void;
   openWorkspace?(path: string): void;
   selectProject?(projectId: string): void;
+  confirmWeeklyFocus?(): void;
   selectedProjectId?: string | null;
 }
 
@@ -54,7 +55,15 @@ function renderWeeklyFocus(parent: HTMLElement, model: PortfolioModel, actions: 
 
 function renderFocusSuggestions(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-focus-suggestions-card" });
-  card.createDiv({ cls: "ts-card-label", text: "FOCUS SUGGESTIONS" });
+  const head = card.createDiv({ cls: "ts-card-head" });
+  head.createSpan({ cls: "ts-card-label", text: "FOCUS SUGGESTIONS" });
+  if (actions.confirmWeeklyFocus) {
+    const btn = head.createEl("button", { cls: "ts-focus-confirm-btn", text: "确认下周 Focus" });
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      actions.confirmWeeklyFocus?.();
+    });
+  }
   const suggestions = model.projects
     .filter(project => !project.focusRole && project.lifecycle !== "paused")
     .filter(project => project.priority === "P0" || project.priority === "P1" || project.health.status !== "健康")

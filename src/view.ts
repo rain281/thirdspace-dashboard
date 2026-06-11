@@ -35,6 +35,10 @@ import { loadPortfolioModel } from "./data/project-management-reader";
 import {
   deriveTodayExecution,
   deriveTodayFocusCoverage,
+  createFocusConfirmationPreviews,
+  focusWeeklyPlanPath,
+  FOCUS_WEEK_PATH,
+  nextIsoWeek,
   selectTodayNextAction,
   type PortfolioModel,
   type TodayExecutionModel,
@@ -325,6 +329,20 @@ export class DashboardView extends ItemView {
         },
         openFile: path => this.openFile(path),
         openWorkspace: path => this.openWorkspace(path),
+        confirmWeeklyFocus: async () => {
+          const week = nextIsoWeek();
+          const [existingFocusYaml, existingWeeklyPlan] = await Promise.all([
+            this.app.vault.adapter.read(FOCUS_WEEK_PATH).catch(() => ""),
+            this.app.vault.adapter.read(focusWeeklyPlanPath(week)).catch(() => ""),
+          ]);
+          const previews = createFocusConfirmationPreviews({
+            week,
+            projects: portfolio.projects,
+            existingFocusYaml,
+            existingWeeklyPlan,
+          });
+          this.confirmAndApplyWrites([previews.yaml, previews.weeklyPlan]);
+        },
       },
     );
   }
@@ -1557,6 +1575,31 @@ export class DashboardView extends ItemView {
       new Notice("ThirdSpace Dashboard：写入完成");
       await this.render();
     }).open();
+  }
+
+  private confirmAndApplyWrites(previews: ControlledWritePreview[]) {
+    const [first, ...rest] = previews;
+    if (!first) return;
+    new WritePreviewModal(this.app, first, async () => {
+      await this.applyPreview(first);
+      if (rest.length > 0) {
+        window.setTimeout(() => this.confirmAndApplyWrites(rest), 0);
+      } else {
+        await this.render();
+      }
+    }).open();
+  }
+
+  private async applyPreview(preview: ControlledWritePreview) {
+    const current = await this.app.vault.adapter.read(preview.path).catch(() => preview.before);
+    const next = applyControlledWritePreview(preview, current);
+    const file = this.app.vault.getAbstractFileByPath(preview.path) as TFile | null;
+    if (file) {
+      await this.app.vault.modify(file, next);
+    } else {
+      await this.app.vault.create(preview.path, next);
+    }
+    new Notice("ThirdSpace Dashboard：写入完成");
   }
 
   /** 局部刷新 todo card，不触发全页重绘 */

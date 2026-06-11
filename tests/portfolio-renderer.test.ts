@@ -21,6 +21,10 @@ class FakeElement {
     return this.append(new FakeElement(options.cls ?? "", options.text ?? ""));
   }
 
+  createEl(tag: string, options: { cls?: string; text?: string } = {}): FakeElement {
+    return this.append(new FakeElement(options.cls ?? tag, options.text ?? ""));
+  }
+
   addEventListener(event: string, listener: () => void): void {
     const listeners = this.listeners.get(event) ?? [];
     listeners.push(listener);
@@ -28,7 +32,7 @@ class FakeElement {
   }
 
   click(): void {
-    for (const listener of this.listeners.get("click") ?? []) listener();
+    for (const listener of this.listeners.get("click") ?? []) listener({ stopPropagation() {} } as unknown as Event);
   }
 
   textContent(): string {
@@ -120,16 +124,21 @@ const populatedPortfolio: PortfolioModel = {
 };
 
 const opened: string[] = [];
+let confirmedFocus = 0;
 const parent = new FakeElement();
 renderPortfolio(
   parent as unknown as HTMLElement,
   populatedPortfolio,
-  { openFile: path => opened.push(path) },
+  {
+    openFile: path => opened.push(path),
+    confirmWeeklyFocus: () => { confirmedFocus += 1; },
+  },
 );
 
 const text = parent.textContent();
 assert.match(text, /PORTFOLIO HEALTH/);
 assert.match(text, /WEEKLY FOCUS/);
+assert.match(text, /确认下周 Focus/);
 assert.match(text, /Kora/);
 assert.match(text, /P0/);
 assert.match(text, /交付/);
@@ -142,6 +151,9 @@ assert.match(text, /发布门禁未关闭/);
 assert.match(text, /确认首屏密度/);
 assert.match(text, /npm run build/);
 assert.doesNotMatch(text, /SYSTEM SIGNALS/);
+
+parent.findByClass("ts-focus-confirm-btn")?.click();
+assert.equal(confirmedFocus, 1);
 
 parent.findByClass("ts-project-card")?.click();
 assert.deepEqual(opened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);

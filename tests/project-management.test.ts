@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   currentIsoWeek,
+  createFocusConfirmationPreviews,
   deriveManagedProjects,
   derivePortfolioSummary,
   deriveTodayFocusCoverage,
@@ -158,6 +159,33 @@ assert.equal(fallbackFocus.confirmationStatus, "pending");
 assert.equal(fallbackFocus.focusLimit, 3);
 assert.equal(fallbackFocus.focusProjects.length, 0);
 assert.match(currentIsoWeek(new Date("2026-06-05T12:00:00+08:00")), /^2026-W23$/);
+
+const focusConfirmation = createFocusConfirmationPreviews({
+  week: "2026-W25",
+  projects: [
+    { id: "kora", name: "Kora", priority: "P0", health: { status: "风险", reasons: ["存在未处理风险"] }, lifecycle: "active" },
+    { id: "pilot", name: "Pilot", priority: "P1", health: { status: "注意", reasons: ["存在待决策"] }, lifecycle: "active" },
+    { id: "aidv", name: "AIDV", priority: "P2", health: { status: "健康", reasons: [] }, lifecycle: "watch" },
+    { id: "archived", name: "Archived", priority: "P0", health: { status: "风险", reasons: ["不应进入"] }, lifecycle: "archived" },
+  ],
+  existingFocusYaml: "",
+  existingWeeklyPlan: "# 2026-W25 周计划\n\n## 本周 Focus\n\n手写计划保留。\n",
+});
+
+assert.equal(focusConfirmation.yaml.path, ".thirdspace/focus-week.yaml");
+assert.match(focusConfirmation.yaml.after, /week: "2026-W25"/);
+assert.match(focusConfirmation.yaml.after, /id: "kora"/);
+assert.match(focusConfirmation.yaml.after, /role: "main"/);
+assert.match(focusConfirmation.yaml.after, /id: "pilot"/);
+assert.match(focusConfirmation.yaml.after, /role: "support"/);
+assert.match(focusConfirmation.yaml.after, /id: "aidv"/);
+assert.match(focusConfirmation.yaml.after, /role: "maintenance"/);
+assert.doesNotMatch(focusConfirmation.yaml.after, /archived/);
+assert.match(focusConfirmation.weeklyPlan.after, /手写计划保留。/);
+assert.match(focusConfirmation.weeklyPlan.writeContent, /Kora：主项目/);
+assert.match(focusConfirmation.weeklyPlan.writeContent, /Pilot：副项目/);
+assert.match(focusConfirmation.weeklyPlan.writeContent, /AIDV：维护项目/);
+assert.equal(focusConfirmation.focusProjects.length, 3);
 
 const indexProjects: ProjectIndexLike[] = [
   {
