@@ -968,6 +968,38 @@
   color: color-mix(in srgb, var(--ts-yellow) 78%, var(--ts-text) 22%);
 }
 
+.ts-detail-section--actions {
+  grid-column: span 2;
+}
+
+.ts-detail-actions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.ts-detail-action-btn {
+  min-width: 0;
+  min-height: 25px;
+  overflow: hidden;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: var(--background-secondary);
+  color: var(--ts-text);
+  font-size: 9.5px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ts-detail-action-btn:hover {
+  border-color: var(--ts-accent-2);
+  background: color-mix(in srgb, var(--ts-accent-2) 16%, transparent 84%);
+}
+
 .ts-detail-links {
   gap: 5px;
 }

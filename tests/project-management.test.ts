@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   currentIsoWeek,
   createFocusConfirmationPreviews,
+  createProjectDetailActionPreview,
   deriveManagedProjects,
   derivePortfolioSummary,
   deriveTodayFocusCoverage,
@@ -186,6 +187,52 @@ assert.match(focusConfirmation.weeklyPlan.writeContent, /Kora：主项目/);
 assert.match(focusConfirmation.weeklyPlan.writeContent, /Pilot：副项目/);
 assert.match(focusConfirmation.weeklyPlan.writeContent, /AIDV：维护项目/);
 assert.equal(focusConfirmation.focusProjects.length, 3);
+
+const nextStepPreview = createProjectDetailActionPreview({
+  project: {
+    id: "kora",
+    name: "Kora",
+    lifecycle: "active",
+    statusNote: "04-项目/产品系统/Kora/Kora项目状态.md",
+  },
+  action: "next-step",
+  text: "建立学习收件箱。",
+  existingContent: "# Kora 项目状态\n\n## 下一步\n\n原下一步\n\n## 风险与阻塞\n\n",
+});
+
+assert.equal(nextStepPreview.path, "04-项目/产品系统/Kora/Kora项目状态.md");
+assert.equal(nextStepPreview.title, "更新 Kora 下一步");
+assert.match(nextStepPreview.after, /## 下一步\n\n原下一步/);
+assert.match(nextStepPreview.writeContent, /- \[ \] 建立学习收件箱。/);
+assert.match(nextStepPreview.writeContent, /thirdspace-dashboard:start project-next-step/);
+
+const riskPreview = createProjectDetailActionPreview({
+  project: {
+    id: "pilot",
+    name: "Pilot",
+    lifecycle: "active",
+    statusNote: "04-项目/产品系统/Pilot/Pilot项目状态.md",
+  },
+  action: "risk",
+  text: "Mail.app 权限仍未确认。",
+  existingContent: "# Pilot 项目状态\n",
+});
+
+assert.equal(riskPreview.title, "新增 Pilot 风险");
+assert.match(riskPreview.after, /## 风险与阻塞/);
+assert.match(riskPreview.writeContent, /Mail\.app 权限仍未确认。/);
+
+assert.throws(() => createProjectDetailActionPreview({
+  project: {
+    id: "archived",
+    name: "Archived",
+    lifecycle: "archived",
+    statusNote: "99-归档/Archived/状态.md",
+  },
+  action: "decision",
+  text: "是否重启。",
+  existingContent: "",
+}), /archived/);
 
 const indexProjects: ProjectIndexLike[] = [
   {

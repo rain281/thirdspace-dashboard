@@ -225,6 +225,7 @@ assert.match(pendingFocusParent.textContent(), /Weekly Focus pending confirmatio
 const selected: string[] = [];
 const detailOpened: string[] = [];
 const workspaceOpened: string[] = [];
+const detailActions: Array<[string, string]> = [];
 const detailParent = new FakeElement();
 renderPortfolio(
   detailParent as unknown as HTMLElement,
@@ -234,6 +235,7 @@ renderPortfolio(
     selectProject: id => selected.push(id),
     openFile: path => detailOpened.push(path),
     openWorkspace: path => workspaceOpened.push(path),
+    projectDetailAction: (projectId, action) => detailActions.push([projectId, action]),
   },
 );
 
@@ -248,6 +250,9 @@ assert.match(detailText, /Milestone/);
 assert.match(detailText, /M2 Portfolio/);
 assert.match(detailText, /Next Step/);
 assert.match(detailText, /完成只读 Portfolio/);
+assert.match(detailText, /更新下一步/);
+assert.match(detailText, /新增风险/);
+assert.match(detailText, /新增待决策/);
 assert.match(detailText, /Quick Links/);
 assert.match(detailText, /状态笔记/);
 assert.match(detailText, /首页/);
@@ -257,6 +262,15 @@ assert.match(detailText, /仓库/);
 detailParent.findByClass("ts-project-card")?.click();
 assert.deepEqual(selected, ["kora"]);
 assert.deepEqual(detailOpened, []);
+
+detailParent.findByClass("ts-detail-action--next-step")?.click();
+detailParent.findByClass("ts-detail-action--risk")?.click();
+detailParent.findByClass("ts-detail-action--decision")?.click();
+assert.deepEqual(detailActions, [
+  ["kora", "next-step"],
+  ["kora", "risk"],
+  ["kora", "decision"],
+]);
 
 detailParent
   .findAllByClass("ts-detail-link-row")

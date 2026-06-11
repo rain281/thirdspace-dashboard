@@ -36,11 +36,13 @@ import {
   deriveTodayExecution,
   deriveTodayFocusCoverage,
   createFocusConfirmationPreviews,
+  createProjectDetailActionPreview,
   focusWeeklyPlanPath,
   FOCUS_WEEK_PATH,
   nextIsoWeek,
   selectTodayNextAction,
   type PortfolioModel,
+  type ProjectDetailAction,
   type TodayExecutionModel,
   type TodayFocusCoverage,
 } from "./data/project-management";
@@ -113,6 +115,56 @@ class TodoModal extends Modal {
     cancel.addEventListener("click", () => this.close());
   }
   onClose() { this.contentEl.empty(); }
+}
+
+class TextInputModal extends Modal {
+  private title: string;
+  private placeholder: string;
+  private onSubmit: (text: string) => void;
+
+  constructor(app: any, title: string, placeholder: string, onSubmit: (text: string) => void) {
+    super(app);
+    this.title = title;
+    this.placeholder = placeholder;
+    this.onSubmit = onSubmit;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("ts-modal");
+    contentEl.createEl("h3", { text: this.title, cls: "ts-modal-title" });
+    const input = contentEl.createEl("input", { type: "text", cls: "ts-modal-input" });
+    input.placeholder = this.placeholder;
+    input.focus();
+    const submit = () => {
+      const val = input.value.trim();
+      if (val) {
+        this.onSubmit(val);
+        this.close();
+      }
+    };
+    const row = contentEl.createDiv({ cls: "ts-modal-row" });
+    const confirm = row.createEl("button", { text: "生成预览", cls: "ts-modal-btn ts-modal-btn--primary" });
+    confirm.addEventListener("click", submit);
+    const cancel = row.createEl("button", { text: "取消", cls: "ts-modal-btn" });
+    cancel.addEventListener("click", () => this.close());
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+function projectDetailActionTitle(projectName: string, action: ProjectDetailAction): string {
+  if (action === "next-step") return `更新 ${projectName} 下一步`;
+  if (action === "risk") return `新增 ${projectName} 风险`;
+  return `新增 ${projectName} 待决策`;
+}
+
+function projectDetailActionPlaceholder(action: ProjectDetailAction): string {
+  if (action === "next-step") return "输入下一步，例如：完成部署验证";
+  if (action === "risk") return "输入风险或阻塞，例如：权限方案未确认";
+  return "输入待决策问题，例如：是否先做只读版";
 }
 
 class WritePreviewModal extends Modal {
@@ -342,6 +394,9 @@ export class DashboardView extends ItemView {
             existingWeeklyPlan,
           });
           this.confirmAndApplyWrites([previews.yaml, previews.weeklyPlan]);
+        },
+        projectDetailAction: (projectId, action) => {
+          void this.openProjectDetailActionModal(portfolio, projectId, action);
         },
       },
     );
@@ -1564,15 +1619,7 @@ export class DashboardView extends ItemView {
 
   private confirmAndApplyWrite(preview: ControlledWritePreview) {
     new WritePreviewModal(this.app, preview, async () => {
-      const current = await this.app.vault.adapter.read(preview.path).catch(() => preview.before);
-      const next = applyControlledWritePreview(preview, current);
-      const file = this.app.vault.getAbstractFileByPath(preview.path) as TFile | null;
-      if (file) {
-        await this.app.vault.modify(file, next);
-      } else {
-        await this.app.vault.create(preview.path, next);
-      }
-      new Notice("ThirdSpace Dashboard：写入完成");
+      await this.applyPreview(preview);
       await this.render();
     }).open();
   }
@@ -1600,6 +1647,23 @@ export class DashboardView extends ItemView {
       await this.app.vault.create(preview.path, next);
     }
     new Notice("ThirdSpace Dashboard：写入完成");
+  }
+
+  private async openProjectDetailActionModal(
+    portfolio: PortfolioModel,
+    projectId: string,
+    action: ProjectDetailAction,
+  ) {
+    const project = portfolio.projects.find(item => item.id === projectId);
+    if (!project || !project.statusNote || project.lifecycle === "archived") {
+      new Notice("项目状态笔记不可写");
+      return;
+    }
+    new TextInputModal(this.app, projectDetailActionTitle(project.name, action), projectDetailActionPlaceholder(action), async text => {
+      const existingContent = await this.app.vault.adapter.read(project.statusNote).catch(() => "");
+      const preview = createProjectDetailActionPreview({ project, action, text, existingContent });
+      this.confirmAndApplyWrite(preview);
+    }).open();
   }
 
   /** 局部刷新 todo card，不触发全页重绘 */

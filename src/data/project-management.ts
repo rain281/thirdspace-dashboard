@@ -184,6 +184,15 @@ export interface FocusConfirmationPreviews {
   weeklyPlan: ControlledWritePreview;
 }
 
+export type ProjectDetailAction = "next-step" | "risk" | "decision";
+
+export interface ProjectDetailActionPreviewInput {
+  project: Pick<ManagedProject, "id" | "name" | "lifecycle" | "statusNote">;
+  action: ProjectDetailAction;
+  text: string;
+  existingContent: string;
+}
+
 export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek {
   if (!content.trim()) return emptyFocusWeek(now);
   const lines = content.split("\n");
@@ -295,6 +304,24 @@ export function createFocusConfirmationPreviews(input: FocusConfirmationPreviewI
   return { focusProjects, yaml, weeklyPlan };
 }
 
+export function createProjectDetailActionPreview(input: ProjectDetailActionPreviewInput): ControlledWritePreview {
+  if (input.project.lifecycle === "archived") throw new Error("archived projects are read-only");
+  if (!input.project.statusNote) throw new Error("project status note is missing");
+  const config = projectDetailActionConfig(input.action, input.project.name);
+  return createManagedSectionPreview({
+    path: input.project.statusNote,
+    title: config.title,
+    section: config.section,
+    marker: config.marker,
+    existingContent: input.existingContent,
+    content: `- [ ] ${input.text.trim()}`,
+    warnings: [
+      `只会写入项目状态笔记的 ## ${config.section} section。`,
+      "不会修改归档项目，也不会写入代码仓库文件。",
+    ],
+  });
+}
+
 export function focusWeeklyPlanPath(week: string): string {
   return `02-日记/周计划/${week}_周计划.md`;
 }
@@ -388,6 +415,32 @@ function formatFocusWeeklyPlanMirror(
 
 function focusWeeklyPlanSkeleton(week: string): string {
   return [`# ${week} 周计划`, "", "## 本周 Focus", ""].join("\n");
+}
+
+function projectDetailActionConfig(action: ProjectDetailAction, projectName: string): {
+  title: string;
+  section: ProjectStatusSection;
+  marker: string;
+} {
+  if (action === "next-step") {
+    return {
+      title: `更新 ${projectName} 下一步`,
+      section: "下一步",
+      marker: "project-next-step",
+    };
+  }
+  if (action === "risk") {
+    return {
+      title: `新增 ${projectName} 风险`,
+      section: "风险与阻塞",
+      marker: "project-risk",
+    };
+  }
+  return {
+    title: `新增 ${projectName} 待决策`,
+    section: "待决策",
+    marker: "project-decision",
+  };
 }
 
 function escapeYaml(value: string): string {

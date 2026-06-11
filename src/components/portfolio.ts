@@ -1,10 +1,11 @@
-import type { ManagedProject, PortfolioModel, ProjectHealthStatus } from "../data/project-management";
+import type { ManagedProject, PortfolioModel, ProjectDetailAction, ProjectHealthStatus } from "../data/project-management";
 
 export interface PortfolioActions {
   openFile(path: string): void;
   openWorkspace?(path: string): void;
   selectProject?(projectId: string): void;
   confirmWeeklyFocus?(): void;
+  projectDetailAction?(projectId: string, action: ProjectDetailAction): void;
   selectedProjectId?: string | null;
 }
 
@@ -158,6 +159,7 @@ function renderProjectDetail(parent: HTMLElement, model: PortfolioModel, actions
   detailSection(grid, "Recent Status", selected.recentStatus);
 
   renderContextReadiness(grid, selected);
+  renderProjectDetailActions(grid, selected, actions);
   renderQuickLinks(grid, selected, actions);
 }
 
@@ -183,6 +185,30 @@ function renderContextReadiness(parent: HTMLElement, project: ManagedProject): v
   readinessChip(row, "状态", Boolean(project.statusNote));
   readinessChip(row, "上下文", Boolean(project.codexContext));
   readinessChip(row, "仓库", Boolean(project.repoPath));
+}
+
+function renderProjectDetailActions(parent: HTMLElement, project: ManagedProject, actions: PortfolioActions): void {
+  if (!actions.projectDetailAction || project.lifecycle === "archived" || !project.statusNote) return;
+  const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--actions" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "Actions" });
+  const row = section.createDiv({ cls: "ts-detail-actions" });
+  detailAction(row, "更新下一步", "next-step", project, actions);
+  detailAction(row, "新增风险", "risk", project, actions);
+  detailAction(row, "新增待决策", "decision", project, actions);
+}
+
+function detailAction(
+  parent: HTMLElement,
+  label: string,
+  action: ProjectDetailAction,
+  project: ManagedProject,
+  actions: PortfolioActions,
+): void {
+  const btn = parent.createEl("button", { cls: `ts-detail-action-btn ts-detail-action--${action}`, text: label });
+  btn.addEventListener("click", event => {
+    event.stopPropagation();
+    actions.projectDetailAction?.(project.id, action);
+  });
 }
 
 function readinessChip(parent: HTMLElement, label: string, ok: boolean): void {
