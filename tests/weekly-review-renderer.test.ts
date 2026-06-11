@@ -6,6 +6,7 @@ class FakeElement {
   cls = "";
   text = "";
   children: FakeElement[] = [];
+  listeners = new Map<string, Array<() => void>>();
 
   constructor(cls = "", text = "") {
     this.cls = cls;
@@ -24,6 +25,16 @@ class FakeElement {
     return this.append(new FakeElement(options.cls ?? tag, options.text ?? ""));
   }
 
+  addEventListener(event: string, listener: () => void): void {
+    const listeners = this.listeners.get(event) ?? [];
+    listeners.push(listener);
+    this.listeners.set(event, listeners);
+  }
+
+  click(): void {
+    for (const listener of this.listeners.get("click") ?? []) listener({ stopPropagation() {} } as unknown as Event);
+  }
+
   textContent(): string {
     return [this.text, ...this.children.map(child => child.textContent())].filter(Boolean).join(" ");
   }
@@ -33,6 +44,15 @@ class FakeElement {
       ...(this.cls.split(/\s+/).includes(cls) ? [this] : []),
       ...this.children.flatMap(child => child.findAllByClass(cls)),
     ];
+  }
+
+  findByClass(cls: string): FakeElement | null {
+    if (this.cls.split(/\s+/).includes(cls)) return this;
+    for (const child of this.children) {
+      const found = child.findByClass(cls);
+      if (found) return found;
+    }
+    return null;
   }
 
   private append(child: FakeElement): FakeElement {
@@ -94,10 +114,14 @@ const model: WeeklyReviewModel = {
 };
 
 const parent = new FakeElement();
-renderWeeklyReview(parent as unknown as HTMLElement, model);
+let writeClicks = 0;
+renderWeeklyReview(parent as unknown as HTMLElement, model, {
+  onWriteWeeklyReview: () => { writeClicks += 1; },
+});
 
 const text = parent.textContent();
 assert.match(text, /WEEKLY REVIEW/);
+assert.match(text, /写入周复盘/);
 assert.match(text, /2026-W24/);
 assert.match(text, /FOCUS REVIEW/);
 assert.match(text, /Kora/);
@@ -112,3 +136,6 @@ assert.match(text, /Mail\.app 权限/);
 assert.match(text, /NEXT WEEK/);
 assert.match(text, /继续主项目 Kora/);
 assert.equal(parent.findAllByClass("ts-review-section").length, 5);
+
+parent.findByClass("ts-review-write-btn")?.click();
+assert.equal(writeClicks, 1);

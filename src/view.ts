@@ -43,7 +43,7 @@ import {
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { DASHBOARD_PAGES, type DashboardPage } from "./components/page-switch";
 import { applyControlledWritePreview, type ControlledWritePreview } from "./data/controlled-write";
-import { deriveWeeklyReview } from "./data/weekly-review";
+import { createWeeklyReviewWritePreview, deriveWeeklyReview, weeklyPlanPath } from "./data/weekly-review";
 import { renderPortfolio } from "./components/portfolio";
 import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
@@ -335,7 +335,13 @@ export class DashboardView extends ItemView {
     weeklyWorklogs: Awaited<ReturnType<typeof loadWeeklyWorklogs>>,
   ) {
     const review = deriveWeeklyReview(portfolio, weeklyWorklogs);
-    renderWeeklyReview(board, review);
+    renderWeeklyReview(board, review, {
+      onWriteWeeklyReview: async () => {
+        const path = weeklyPlanPath(review.week);
+        const existingContent = await this.app.vault.adapter.read(path).catch(() => "");
+        this.confirmAndApplyWrite(createWeeklyReviewWritePreview(review, { existingContent }));
+      },
+    });
   }
 
   private renderSystemPage(

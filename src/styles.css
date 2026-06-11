@@ -502,6 +502,23 @@
   gap: 6px;
 }
 
+.ts-review-write-btn {
+  width: 100%;
+  min-height: 30px;
+  margin: 10px 0 0;
+  border: 1px solid var(--ts-accent-2);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--ts-accent-2) 16%, transparent 84%);
+  color: var(--ts-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ts-review-write-btn:hover {
+  background: color-mix(in srgb, var(--ts-accent-2) 24%, transparent 76%);
+}
+
 .ts-review-metric {
   min-width: 0;
   padding: 7px 8px;

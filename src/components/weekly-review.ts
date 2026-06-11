@@ -6,8 +6,12 @@ import type {
   WeeklyReviewTextItem,
 } from "../data/weekly-review";
 
-export function renderWeeklyReview(parent: HTMLElement, model: WeeklyReviewModel): void {
-  renderSummary(parent.createDiv({ cls: "ts-board-col ts-review-summary-col" }), model);
+export interface WeeklyReviewActions {
+  onWriteWeeklyReview?(): void;
+}
+
+export function renderWeeklyReview(parent: HTMLElement, model: WeeklyReviewModel, actions: WeeklyReviewActions = {}): void {
+  renderSummary(parent.createDiv({ cls: "ts-board-col ts-review-summary-col" }), model, actions);
   renderFocus(parent.createDiv({ cls: "ts-board-col ts-review-focus-col" }), model.focusItems);
   renderOutcomes(parent.createDiv({ cls: "ts-board-col ts-review-outcomes-col" }), model.outcomes);
   renderOffFocus(parent.createDiv({ cls: "ts-board-col ts-review-offfocus-col" }), model);
@@ -15,11 +19,18 @@ export function renderWeeklyReview(parent: HTMLElement, model: WeeklyReviewModel
   renderNextWeek(parent.createDiv({ cls: "ts-board-col ts-review-next-col" }), model);
 }
 
-function renderSummary(parent: HTMLElement, model: WeeklyReviewModel): void {
+function renderSummary(parent: HTMLElement, model: WeeklyReviewModel, actions: WeeklyReviewActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-review-summary-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
   head.createSpan({ cls: "ts-card-label", text: "WEEKLY REVIEW" });
   head.createSpan({ cls: "ts-card-meta", text: `${model.week} · ${model.worklogCount} worklogs` });
+  if (actions.onWriteWeeklyReview) {
+    const btn = card.createEl("button", { cls: "ts-review-write-btn", text: "写入周复盘" });
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      actions.onWriteWeeklyReview?.();
+    });
+  }
   const grid = card.createDiv({ cls: "ts-review-metrics" });
   metric(grid, `${model.focusItems.filter(item => item.hasProgress).length}/${model.focusItems.length}`, "focus moved");
   metric(grid, String(model.outcomes.length), "outcomes");

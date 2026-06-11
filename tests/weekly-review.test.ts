@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { deriveWeeklyReview, type WeeklyWorklogSnapshot } from "../src/data/weekly-review";
+import { createWeeklyReviewWritePreview, deriveWeeklyReview, type WeeklyWorklogSnapshot } from "../src/data/weekly-review";
 import type { PortfolioModel } from "../src/data/project-management";
 
 const portfolio: PortfolioModel = {
@@ -216,3 +216,18 @@ assert.match(review.risks.open[0].text, /发布门禁未关闭/);
 assert.match(review.decisions.pending[0].text, /Mail\.app 权限/);
 assert.match(review.nextWeekProposal.summary, /继续主项目/);
 assert.ok(review.nextWeekProposal.items.some(item => item.projectName === "AIDV" && /暂停或降级/.test(item.reason)));
+
+const writePreview = createWeeklyReviewWritePreview(review, {
+  existingContent: "# 2026-W24 周计划\n\n## 复盘\n\n人类复盘保留。\n",
+});
+
+assert.equal(writePreview.path, "02-日记/周计划/2026-W24_周计划.md");
+assert.equal(writePreview.title, "写入周复盘");
+assert.match(writePreview.summary, /## 复盘/);
+assert.match(writePreview.after, /人类复盘保留。/);
+assert.match(writePreview.writeContent, /Focus 推进/);
+assert.match(writePreview.writeContent, /Kora：推进/);
+assert.match(writePreview.writeContent, /本周产出/);
+assert.match(writePreview.writeContent, /Off-focus/);
+assert.match(writePreview.writeContent, /下周建议/);
+assert.match(writePreview.writeContent, /thirdspace-dashboard:start weekly-review/);

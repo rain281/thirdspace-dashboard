@@ -1,3 +1,4 @@
+import { createManagedSectionPreview, type ControlledWritePreview } from "./controlled-write";
 import type { TimelineItem, TodayWorklog } from "./vault-reader";
 import {
   currentIsoWeek,
@@ -74,6 +75,10 @@ export interface WeeklyReviewModel {
   };
 }
 
+export interface WeeklyReviewWritePreviewInput {
+  existingContent: string;
+}
+
 export function deriveWeeklyReview(
   portfolio: PortfolioModel,
   worklogs: WeeklyWorklogSnapshot[],
@@ -116,6 +121,32 @@ export function deriveWeeklyReview(
     },
     nextWeekProposal: nextWeekProposal(portfolio, focusItems, openRisks, pendingDecisions),
   };
+}
+
+export function createWeeklyReviewWritePreview(
+  review: WeeklyReviewModel,
+  input: WeeklyReviewWritePreviewInput,
+): ControlledWritePreview {
+  return createManagedSectionPreview({
+    path: weeklyPlanPath(review.week),
+    title: "写入周复盘",
+    section: "复盘",
+    marker: "weekly-review",
+    existingContent: input.existingContent || weeklyPlanSkeleton(review.week),
+    content: formatWeeklyReviewMarkdown(review),
+    warnings: [
+      "只会替换 Dashboard managed block，不覆盖 ## 复盘 中的手写内容。",
+      "周复盘来自当前 Dashboard 派生数据；确认前请检查预览内容。",
+    ],
+  });
+}
+
+export function weeklyPlanPath(week: string): string {
+  return `02-日记/周计划/${week}_周计划.md`;
+}
+
+export function weeklyPlanSkeleton(week: string): string {
+  return [`# ${week} 周计划`, "", "## 本周 Focus", "", "## 复盘", ""].join("\n");
 }
 
 function focusReviewItem(project: ManagedProject, outcomes: WeeklyReviewOutcome[]): WeeklyReviewFocusItem {
@@ -250,4 +281,34 @@ function cleanMarkdownLine(text: string): string {
     .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
     .replace(/\[\[([^\]]+)\]\]/g, "$1")
     .trim();
+}
+
+function formatWeeklyReviewMarkdown(review: WeeklyReviewModel): string {
+  return [
+    `### Dashboard 周复盘 · ${review.week}`,
+    "",
+    "#### Focus 推进",
+    ...linesOrEmpty(review.focusItems.map(item => `- ${item.name}：${item.status}，${item.summary}`)),
+    "",
+    "#### 本周产出",
+    ...linesOrEmpty(review.outcomes.map(outcome => `- ${outcome.projectName}：${outcome.title}`)),
+    "",
+    "#### Off-focus",
+    ...linesOrEmpty(review.offFocus.events.map(event => `- ${event.date} ${event.projectName}：${event.reason || "未填写原因"}${event.target ? ` -> ${event.target}` : ""}`)),
+    "",
+    "#### 风险与决策",
+    ...linesOrEmpty([
+      ...review.risks.open.map(item => `- 风险：${item.projectName}：${item.text}`),
+      ...review.decisions.pending.map(item => `- 待决策：${item.projectName}：${item.text}`),
+      ...review.decisions.made.map(item => `- 已决策：${item.projectName}：${item.text}`),
+    ]),
+    "",
+    "#### 下周建议",
+    `- ${review.nextWeekProposal.summary}`,
+    ...review.nextWeekProposal.items.map(item => `- ${item.projectName}：${item.reason}`),
+  ].join("\n");
+}
+
+function linesOrEmpty(lines: string[]): string[] {
+  return lines.length > 0 ? lines : ["- 无"];
 }
