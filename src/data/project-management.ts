@@ -1,3 +1,5 @@
+import type { ProjectBacklogItem, TimelineItem, TodayWorklog } from "./vault-reader";
+
 export const STANDARD_PROJECT_STATUS_SECTIONS = [
   "项目摘要",
   "目标",
@@ -464,6 +466,67 @@ export interface TodayFocusCoverage {
   offFocusProjects: string[];
 }
 
+export interface TodayExecutionOutcome {
+  title: string;
+  subtitle: string;
+  badge: string;
+  targetPath?: string;
+}
+
+export type TodayCommitmentRiskKind = "blocked" | "too-many-todos" | "off-focus" | "missing-output";
+
+export interface TodayCommitmentRisk {
+  kind: TodayCommitmentRiskKind;
+  text: string;
+  tone: "warn" | "notice";
+}
+
+export interface TodayDecisionNeeded {
+  projectId: string;
+  projectName: string;
+  role: FocusRole | null;
+  text: string;
+}
+
+export type TodayNextActionHintKind = "focus-todo" | "focus-backlog" | "focus-next-step" | "off-focus-todo" | "off-focus-backlog";
+
+export interface TodayNextActionHint {
+  kind: TodayNextActionHintKind;
+  projectId: string;
+  projectName: string;
+  role: FocusRole | null;
+  text: string;
+  backlogItem?: ProjectBacklogItem;
+}
+
+export interface TodayExecutionModel {
+  outcomes: TodayExecutionOutcome[];
+  focusCoverage: TodayFocusCoverage;
+  offFocusProjects: string[];
+  commitmentsAtRisk: TodayCommitmentRisk[];
+  decisionsNeeded: TodayDecisionNeeded[];
+  nextActionHints: TodayNextActionHint[];
+}
+
+export interface TodayNextAction {
+  tone: "missing" | "warn" | "todo" | "pool" | "summary" | "idle";
+  badge: string;
+  title: string;
+  reason: string;
+  button: string;
+  target: "today" | "project";
+  projectItem?: ProjectBacklogItem;
+  risks: string[];
+}
+
+export interface SelectTodayNextActionInput {
+  today: TodayWorklog;
+  missingLog: boolean;
+  projectBacklog: ProjectBacklogItem[];
+  execution: TodayExecutionModel;
+  todayLogPath: string;
+}
+
 export function deriveTodayFocusCoverage(model: PortfolioModel, todayProjectNames: Set<string>): TodayFocusCoverage {
   if (model.focusWeek.confirmationStatus !== "confirmed") {
     return {
@@ -508,6 +571,332 @@ export function deriveTodayFocusCoverage(model: PortfolioModel, todayProjectName
   };
 }
 
+export function deriveTodayExecution(
+  today: TodayWorklog,
+  portfolio: PortfolioModel,
+  projectBacklog: ProjectBacklogItem[],
+  focusCoverage: TodayFocusCoverage,
+): TodayExecutionModel {
+  const pendingTodos = today.todos.filter(todo => !todo.done);
+  const blockedTexts = [
+    ...pendingTodos.map(todo => todo.text),
+    ...today.timeline.flatMap(item => [item.title, item.subtitle ?? "", item.raw]),
+  ].filter(isActiveBlockedText);
+
+  const commitmentsAtRisk: TodayCommitmentRisk[] = [];
+  if (blockedTexts.length > 0) {
+    commitmentsAtRisk.push({
+      kind: "blocked",
+      text: blockedTexts[0],
+      tone: "warn",
+    });
+  }
+  if (pendingTodos.length >= 5) {
+    commitmentsAtRisk.push({
+      kind: "too-many-todos",
+      text: `${pendingTodos.length} 个未完成 Todo`,
+      tone: "notice",
+    });
+  }
+  if (focusCoverage.offFocusProjects.length > 0) {
+    commitmentsAtRisk.push({
+      kind: "off-focus",
+      text: `Off-focus：${focusCoverage.offFocusProjects.join(" / ")}`,
+      tone: "notice",
+    });
+  }
+  if (!today.timeline.some(item => item.kind === "output")) {
+    commitmentsAtRisk.push({
+      kind: "missing-output",
+      text: "今天还没有记录产出",
+      tone: "notice",
+    });
+  }
+
+  return {
+    outcomes: today.timeline
+      .filter(item => item.kind === "output")
+      .slice(0, 3)
+      .map(toTodayOutcome),
+    focusCoverage,
+    offFocusProjects: focusCoverage.offFocusProjects,
+    commitmentsAtRisk,
+    decisionsNeeded: deriveTodayDecisions(portfolio),
+    nextActionHints: deriveTodayNextActionHints(today, portfolio, projectBacklog),
+  };
+}
+
+export function selectTodayNextAction(input: SelectTodayNextActionInput): TodayNextAction {
+  const { today, missingLog, projectBacklog, execution, todayLogPath } = input;
+  const risks = nextActionRisks(today, execution);
+  const blocked = execution.commitmentsAtRisk.filter(item => item.kind === "blocked");
+
+  if (missingLog) {
+    return {
+      tone: "missing",
+      badge: "启动",
+      title: "创建今天工作日志",
+      reason: todayLogPath,
+      button: "创建",
+      target: "today",
+      risks,
+    };
+  }
+
+  if (blocked.length > 0) {
+    return {
+      tone: "warn",
+      badge: "阻塞",
+      title: blocked[0].text,
+      reason: `${blocked.length} 个活跃阻塞`,
+      button: "打开",
+      target: "today",
+      risks,
+    };
+  }
+
+  const preferredHint = execution.nextActionHints.find(hint => hint.kind === "focus-todo")
+    ?? execution.nextActionHints.find(hint => hint.kind === "off-focus-todo")
+    ?? execution.nextActionHints.find(hint => hint.kind === "focus-backlog")
+    ?? execution.nextActionHints.find(hint => hint.kind === "focus-next-step")
+    ?? execution.nextActionHints.find(hint => hint.kind === "off-focus-backlog");
+
+  if (preferredHint) {
+    return nextActionFromHint(preferredHint, risks);
+  }
+
+  if (projectBacklog.length > 0) {
+    const item = projectBacklog[0];
+    return {
+      tone: "pool",
+      badge: item.project,
+      title: item.text,
+      reason: "没有 Focus 候选，可以从项目池拉入一项",
+      button: "加入今日",
+      target: "project",
+      projectItem: item,
+      risks,
+    };
+  }
+
+  if (today.timeline.length > 0 && execution.outcomes.length === 0) {
+    return {
+      tone: "summary",
+      badge: "总结",
+      title: "补写今日产出",
+      reason: "今天已有记录，但还没有产出条目",
+      button: "写总结",
+      target: "today",
+      risks,
+    };
+  }
+
+  return {
+    tone: "idle",
+    badge: "启动",
+    title: "设定今日重点",
+    reason: "没有未完成 Todo 或项目池候选",
+    button: "打开",
+    target: "today",
+    risks,
+  };
+}
+
 function normalizeProjectKey(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function nextActionFromHint(hint: TodayNextActionHint, risks: string[]): TodayNextAction {
+  const roleLabel = hint.role ? focusRoleLabel(hint.role) : "OFF-FOCUS";
+  if (hint.kind === "focus-backlog" || hint.kind === "off-focus-backlog") {
+    return {
+      tone: "pool",
+      badge: roleLabel,
+      title: hint.text,
+      reason: hint.kind === "off-focus-backlog"
+        ? `${hint.projectName} · off-focus 项目池候选`
+        : `${hint.projectName} · Focus 项目池候选`,
+      button: "加入今日",
+      target: "project",
+      projectItem: hint.backlogItem,
+      risks,
+    };
+  }
+  return {
+    tone: "todo",
+    badge: roleLabel,
+    title: hint.text,
+    reason: hint.kind === "off-focus-todo"
+      ? `${hint.projectName} · off-focus，低优先级`
+      : `${hint.projectName} · Focus ${hint.kind === "focus-next-step" ? "下一步" : "Todo"}`,
+    button: "打开",
+    target: "today",
+    risks,
+  };
+}
+
+function toTodayOutcome(item: TimelineItem): TodayExecutionOutcome {
+  return {
+    title: item.title,
+    subtitle: item.subtitle ?? item.time,
+    badge: item.badge,
+    targetPath: item.targetPath,
+  };
+}
+
+function deriveTodayDecisions(portfolio: PortfolioModel): TodayDecisionNeeded[] {
+  return portfolio.projects
+    .flatMap(project => firstMarkdownTask(project.pendingDecisions).map(text => ({
+      projectId: project.id,
+      projectName: project.name,
+      role: project.focusRole,
+      text,
+    })))
+    .sort((a, b) => focusRank(a.role) - focusRank(b.role) || a.projectName.localeCompare(b.projectName))
+    .slice(0, 5);
+}
+
+function deriveTodayNextActionHints(
+  today: TodayWorklog,
+  portfolio: PortfolioModel,
+  projectBacklog: ProjectBacklogItem[],
+): TodayNextActionHint[] {
+  const projectsByKey = new Map<string, ManagedProject>();
+  for (const project of portfolio.projects) {
+    projectsByKey.set(normalizeProjectKey(project.id), project);
+    projectsByKey.set(normalizeProjectKey(project.name), project);
+  }
+
+  const hints: TodayNextActionHint[] = [];
+  for (const todo of today.todos.filter(item => !item.done)) {
+    if (isActiveBlockedText(todo.text)) continue;
+    const project = projectFromText(todo.text, projectsByKey);
+    if (!project) continue;
+    hints.push({
+      kind: project.focusRole ? "focus-todo" : "off-focus-todo",
+      projectId: project.id,
+      projectName: project.name,
+      role: project.focusRole,
+      text: todo.text,
+    });
+  }
+
+  for (const item of projectBacklog) {
+    const project = projectFromText(`${item.project}：${item.text}`, projectsByKey);
+    if (!project) continue;
+    hints.push({
+      kind: project.focusRole ? "focus-backlog" : "off-focus-backlog",
+      projectId: project.id,
+      projectName: project.name,
+      role: project.focusRole,
+      text: item.text,
+      backlogItem: item,
+    });
+  }
+
+  if (hints.every(hint => !hint.kind.startsWith("focus-"))) {
+    const nextFocus = portfolio.projects
+      .filter(project => project.focusRole && project.nextStep.trim())
+      .sort((a, b) => focusRank(a.focusRole) - focusRank(b.focusRole))
+      .at(0);
+    if (nextFocus) {
+      hints.push({
+        kind: "focus-next-step",
+        projectId: nextFocus.id,
+        projectName: nextFocus.name,
+        role: nextFocus.focusRole,
+        text: compactMarkdownLine(nextFocus.nextStep),
+      });
+    }
+  }
+
+  return compactOffFocusHints(hints
+    .sort((a, b) => nextActionHintRank(a) - nextActionHintRank(b)
+      || focusRank(a.role) - focusRank(b.role)
+      || a.projectName.localeCompare(b.projectName))
+  ).slice(0, 6);
+}
+
+function compactOffFocusHints(hints: TodayNextActionHint[]): TodayNextActionHint[] {
+  const offFocusTodoProjects = new Set(hints
+    .filter(hint => hint.kind === "off-focus-todo")
+    .map(hint => hint.projectId));
+  return hints.filter(hint => {
+    if (hint.kind === "off-focus-backlog" && offFocusTodoProjects.has(hint.projectId)) return false;
+    return true;
+  });
+}
+
+function nextActionHintRank(hint: TodayNextActionHint): number {
+  if (hint.kind === "focus-todo") return 0;
+  if (hint.kind === "focus-backlog") return 1;
+  if (hint.kind === "focus-next-step") return 2;
+  if (hint.kind === "off-focus-todo") return 3;
+  return 4;
+}
+
+function projectFromText(text: string, projectsByKey: Map<string, ManagedProject>): ManagedProject | null {
+  const explicit = projectNameFromText(text);
+  if (explicit) return projectsByKey.get(normalizeProjectKey(explicit)) ?? null;
+  const key = normalizeProjectKey(text);
+  for (const [projectKey, project] of projectsByKey) {
+    if (projectKey && key.includes(projectKey)) return project;
+  }
+  return null;
+}
+
+function projectNameFromText(text: string): string | null {
+  const trimmed = text.trim();
+  const prefix = trimmed.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]{2,32})[：:]/);
+  if (prefix) return prefix[1];
+  const dotted = trimmed.match(/^([A-Za-z0-9_\-\u4e00-\u9fa5]{2,32})\s+·\s+/);
+  if (dotted) return dotted[1];
+  return null;
+}
+
+function firstMarkdownTask(markdown: string): string[] {
+  return markdown
+    .split("\n")
+    .map(line => line.replace(/^\s*[-*]\s+(?:\[[ xX]\]\s*)?/, "").trim())
+    .filter(Boolean)
+    .slice(0, 1);
+}
+
+function compactMarkdownLine(markdown: string): string {
+  return markdown
+    .split("\n")
+    .map(line => line.replace(/^\s*[-*]\s+(?:\[[ xX]\]\s*)?/, "").trim())
+    .find(Boolean) ?? "";
+}
+
+function focusRoleLabel(role: FocusRole): string {
+  if (role === "main") return "主项目";
+  if (role === "support") return "副项目";
+  return "维护";
+}
+
+function nextActionRisks(today: TodayWorklog, execution: TodayExecutionModel): string[] {
+  const risks: string[] = [];
+  for (const risk of execution.commitmentsAtRisk) {
+    if (risk.kind === "blocked") risks.push("1 阻塞");
+    if (risk.kind === "too-many-todos") risks.push(`${today.todos.filter(todo => !todo.done).length} 待办`);
+    if (risk.kind === "off-focus") risks.push("off-focus");
+    if (risk.kind === "missing-output") risks.push("无产出");
+  }
+  if (!today.timeline.some(item => item.kind === "git")) risks.push("无 Git");
+  return Array.from(new Set(risks)).slice(0, 3);
+}
+
+function isActiveBlockedText(text: string): boolean {
+  return isBlockedText(text) && !isResolvedBlockedText(text);
+}
+
+function isBlockedText(text: string): boolean {
+  return /(^|[\s\-*◆：:])(?:阻塞|等待|卡住)\s*[：:]|(^|[\s\-*◆：:])blocked\s*(?::|by\b)/i.test(text);
+}
+
+function isResolvedBlockedText(text: string): boolean {
+  if (/已解决|已解除|已处理|✅/i.test(text)) return true;
+  if (/未完成|没完成|没有完成|尚未完成/.test(text)) return false;
+  return /完成/.test(text);
 }

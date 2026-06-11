@@ -1735,7 +1735,7 @@
 .ts-log-body--split {
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, .85fr) minmax(0, .95fr) minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, .72fr) minmax(0, .92fr) minmax(0, .98fr) minmax(0, 1.26fr);
   gap: 6px;
 }
 
@@ -1761,6 +1761,10 @@
 
 .ts-today-subcard--metrics {
   border-color: color-mix(in srgb, var(--ts-green) 18%, var(--ts-border) 82%);
+}
+
+.ts-today-subcard--execution {
+  border-color: color-mix(in srgb, var(--ts-yellow) 22%, var(--ts-border) 78%);
 }
 
 .ts-today-subcard--flow {
@@ -2054,6 +2058,131 @@
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ts-today-exec {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.ts-today-exec-section {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.ts-today-exec-head {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 8.2px;
+  line-height: 1.05;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ts-today-exec-list {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.ts-today-exec-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 4px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--ts-panel) 16%);
+  cursor: pointer;
+}
+
+.ts-today-exec-row:hover {
+  border-color: var(--ts-border-strong);
+  background: var(--ts-hover);
+}
+
+.ts-today-exec-row--warn {
+  border-color: color-mix(in srgb, var(--ts-red) 35%, var(--ts-border) 65%);
+  background: color-mix(in srgb, var(--ts-red) 7%, var(--background-primary) 93%);
+}
+
+.ts-today-exec-row--notice {
+  border-color: color-mix(in srgb, var(--ts-yellow) 32%, var(--ts-border) 68%);
+  background: color-mix(in srgb, var(--ts-yellow) 7%, var(--background-primary) 93%);
+}
+
+.ts-today-exec-badge {
+  max-width: 54px;
+  overflow: hidden;
+  padding: 2px 4px;
+  border: 1px solid var(--ts-border);
+  border-radius: 999px;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 7.5px;
+  line-height: 1;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ts-today-exec-info {
+  min-width: 0;
+}
+
+.ts-today-exec-title,
+.ts-today-exec-sub {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-today-exec-title {
+  color: var(--ts-text);
+  font-size: 9.8px;
+  font-weight: 760;
+}
+
+.ts-today-exec-sub {
+  margin-top: 2px;
+  color: var(--ts-text-3);
+  font-size: 8.4px;
+  font-weight: 650;
+}
+
+.ts-today-exec-empty {
+  flex: 1 1 auto;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  font-size: 9.5px;
+  line-height: 1.2;
 }
 
 .ts-today-init {

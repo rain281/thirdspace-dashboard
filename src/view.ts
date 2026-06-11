@@ -32,9 +32,17 @@ import {
   type ProjectMaterialsItem,
 } from "./data/project-materials";
 import { loadPortfolioModel } from "./data/project-management-reader";
-import { deriveTodayFocusCoverage, type PortfolioModel, type TodayFocusCoverage } from "./data/project-management";
+import {
+  deriveTodayExecution,
+  deriveTodayFocusCoverage,
+  selectTodayNextAction,
+  type PortfolioModel,
+  type TodayExecutionModel,
+  type TodayFocusCoverage,
+} from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { renderPortfolio } from "./components/portfolio";
+import { renderTodayExecution } from "./components/today-execution";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
@@ -211,11 +219,13 @@ export class DashboardView extends ItemView {
     portfolio: PortfolioModel,
   ) {
     const pending = todos.filter(t => !t.done);
-    const focusCoverage = deriveTodayFocusCoverage(portfolio, this.extractProjectNames(todayWorklog ?? this.emptyTodayWorklog()));
+    const today = todayWorklog ?? this.emptyTodayWorklog();
+    const focusCoverage = deriveTodayFocusCoverage(portfolio, this.extractProjectNames(today));
+    const todayExecution = deriveTodayExecution(today, portfolio, projectBacklog, focusCoverage);
 
     const overviewCol = board.createDiv({ cls: "ts-board-col ts-overview-col" });
     const overviewCard = overviewCol.createDiv({ cls: "ts-card ts-compact-card ts-overview-card ts-next-action-card" });
-    this.renderNextAction(overviewCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog, projectBacklog);
+    this.renderNextAction(overviewCard, today, !todayWorklog, projectBacklog, todayExecution);
 
     const quickCol = board.createDiv({ cls: "ts-board-col ts-quick-col" });
     const actCard = quickCol.createDiv({ cls: "ts-card ts-compact-card ts-quick-card" });
@@ -227,7 +237,7 @@ export class DashboardView extends ItemView {
     const logHd   = logCard.createDiv({ cls: "ts-card-head" });
     logHd.createSpan({ cls: "ts-card-label", text: "TODAY" });
     logHd.createSpan({ cls: "ts-card-meta", text: new Date().toLocaleDateString("zh-CN",{month:"short",day:"numeric",weekday:"short"}) });
-    this.renderTodayWorklog(logCard, todayWorklog ?? this.emptyTodayWorklog(), !todayWorklog, focusCoverage);
+    this.renderTodayWorklog(logCard, today, !todayWorklog, focusCoverage, todayExecution);
 
     const todoCol = board.createDiv({ cls: "ts-board-col ts-todo-col" });
     const todoCard = todoCol.createDiv({ cls: "ts-card ts-compact-card ts-todo-card" });
@@ -545,8 +555,15 @@ export class DashboardView extends ItemView {
     today: TodayWorklog,
     missingLog: boolean,
     projectBacklog: ProjectBacklogItem[],
+    execution: TodayExecutionModel,
   ) {
-    const action = this.calculateNextAction(today, missingLog, projectBacklog);
+    const action = selectTodayNextAction({
+      today,
+      missingLog,
+      projectBacklog,
+      execution,
+      todayLogPath: getTodayWorklogPath(),
+    });
     const head = parent.createDiv({ cls: "ts-next-action-head" });
     head.createDiv({ cls: "ts-card-label", text: "NEXT ACTION" });
     head.createDiv({ cls: `ts-next-action-badge ts-next-action-badge--${action.tone}`, text: action.badge });
@@ -768,6 +785,7 @@ export class DashboardView extends ItemView {
     today: TodayWorklog,
     missingLog = false,
     focusCoverage?: TodayFocusCoverage,
+    todayExecution?: TodayExecutionModel,
   ) {
     const body = parent.createDiv({ cls: "ts-log-body ts-log-body--split" });
     const openToday = () => this.openTodayLog();
@@ -795,6 +813,11 @@ export class DashboardView extends ItemView {
     const metricsCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--metrics" });
     metricsCard.createDiv({ cls: "ts-today-subhead", text: "今日指标" });
     this.renderTodayMetrics(metricsCard, today, missingLog, focusCoverage);
+
+    if (todayExecution) {
+      const execCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--execution" });
+      renderTodayExecution(execCard, todayExecution, { openToday });
+    }
 
     const flowCard = body.createDiv({ cls: "ts-today-subcard ts-today-subcard--flow" });
     const flowHead = flowCard.createDiv({ cls: "ts-today-subhead ts-timeline-head" });
@@ -863,7 +886,7 @@ export class DashboardView extends ItemView {
   private renderTodayFocusCoverage(parent: HTMLElement, coverage: TodayFocusCoverage) {
     const wrap = parent.createDiv({ cls: "ts-focus-coverage" });
     const head = wrap.createDiv({ cls: "ts-focus-coverage-head" });
-    head.createSpan({ cls: "ts-focus-coverage-title", text: "本周 Focus" });
+    head.createSpan({ cls: "ts-focus-coverage-title", text: "FOCUS PROJECTS" });
     head.createSpan({
       cls: "ts-focus-coverage-count",
       text: coverage.totalFocus > 0 ? `${coverage.coveredCount}/${coverage.totalFocus}` : coverage.confirmationStatus,
@@ -1052,7 +1075,7 @@ export class DashboardView extends ItemView {
   }
 
   private isBlockedText(text: string): boolean {
-    return /(^|[\s\-*◆])(?:阻塞|等待|卡住)\s*[：:]|(^|[\s\-*◆])blocked\s*(?::|by\b)/i.test(text);
+    return /(^|[\s\-*◆：:])(?:阻塞|等待|卡住)\s*[：:]|(^|[\s\-*◆：:])blocked\s*(?::|by\b)/i.test(text);
   }
 
   private isResolvedBlockedText(text: string): boolean {
