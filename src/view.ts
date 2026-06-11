@@ -42,11 +42,13 @@ import {
 } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { DASHBOARD_PAGES, type DashboardPage } from "./components/page-switch";
+import { applyControlledWritePreview, type ControlledWritePreview } from "./data/controlled-write";
 import { deriveWeeklyReview } from "./data/weekly-review";
 import { renderPortfolio } from "./components/portfolio";
 import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
 import { renderWeeklyReview } from "./components/weekly-review";
+import { renderWritePreviewModalContent } from "./components/write-preview-modal";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
@@ -107,6 +109,40 @@ class TodoModal extends Modal {
     cancel.addEventListener("click", () => this.close());
   }
   onClose() { this.contentEl.empty(); }
+}
+
+class WritePreviewModal extends Modal {
+  private preview: ControlledWritePreview;
+  private onConfirmWrite: () => Promise<void>;
+
+  constructor(app: any, preview: ControlledWritePreview, onConfirmWrite: () => Promise<void>) {
+    super(app);
+    this.preview = preview;
+    this.onConfirmWrite = onConfirmWrite;
+  }
+
+  onOpen() {
+    renderWritePreviewModalContent(this.contentEl, this.preview, {
+      onCancel: () => this.close(),
+      onConfirm: () => {
+        void this.confirm();
+      },
+    });
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+
+  private async confirm() {
+    try {
+      await this.onConfirmWrite();
+      this.close();
+    } catch (error) {
+      new Notice(`写入失败：${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
 }
 
 // ── Dashboard View ────────────────────────────────────────────
@@ -1499,6 +1535,21 @@ export class DashboardView extends ItemView {
     new TodoModal(this.app, async (text) => {
       await addTodoToWorklog(this.app, text);
       await this.refreshTodoSection();
+    }).open();
+  }
+
+  private confirmAndApplyWrite(preview: ControlledWritePreview) {
+    new WritePreviewModal(this.app, preview, async () => {
+      const current = await this.app.vault.adapter.read(preview.path).catch(() => preview.before);
+      const next = applyControlledWritePreview(preview, current);
+      const file = this.app.vault.getAbstractFileByPath(preview.path) as TFile | null;
+      if (file) {
+        await this.app.vault.modify(file, next);
+      } else {
+        await this.app.vault.create(preview.path, next);
+      }
+      new Notice("ThirdSpace Dashboard：写入完成");
+      await this.render();
     }).open();
   }
 
