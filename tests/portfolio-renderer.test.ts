@@ -124,7 +124,6 @@ const parent = new FakeElement();
 renderPortfolio(
   parent as unknown as HTMLElement,
   populatedPortfolio,
-  { discoveryPending: 2, onboardingPending: 1, materialsPending: 3, recentCount: 4 },
   { openFile: path => opened.push(path) },
 );
 
@@ -142,6 +141,7 @@ assert.match(text, /完成只读 Portfolio/);
 assert.match(text, /发布门禁未关闭/);
 assert.match(text, /确认首屏密度/);
 assert.match(text, /npm run build/);
+assert.doesNotMatch(text, /SYSTEM SIGNALS/);
 
 parent.findByClass("ts-project-card")?.click();
 assert.deepEqual(opened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
@@ -160,7 +160,6 @@ renderPortfolio(
       },
     ],
   },
-  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
   { openFile: path => fallbackOpened.push(path) },
 );
 fallbackParent.findByClass("ts-project-card")?.click();
@@ -185,7 +184,6 @@ renderPortfolio(
     },
     projects: [],
   },
-  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
   { openFile: () => undefined },
 );
 
@@ -207,7 +205,6 @@ renderPortfolio(
       focusUsed: 0,
     },
   },
-  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
   { openFile: () => undefined },
 );
 
@@ -220,7 +217,6 @@ const detailParent = new FakeElement();
 renderPortfolio(
   detailParent as unknown as HTMLElement,
   populatedPortfolio,
-  { discoveryPending: 0, onboardingPending: 0, materialsPending: 0, recentCount: 0 },
   {
     selectedProjectId: "kora",
     selectProject: id => selected.push(id),

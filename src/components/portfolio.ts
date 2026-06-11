@@ -7,17 +7,9 @@ export interface PortfolioActions {
   selectedProjectId?: string | null;
 }
 
-export interface MaintenanceCounts {
-  discoveryPending: number;
-  onboardingPending: number;
-  materialsPending: number;
-  recentCount: number;
-}
-
 export function renderPortfolio(
   parent: HTMLElement,
   model: PortfolioModel,
-  maintenance: MaintenanceCounts,
   actions: PortfolioActions,
 ): void {
   const shell = parent.createDiv({ cls: "ts-portfolio" });
@@ -27,7 +19,6 @@ export function renderPortfolio(
   renderRiskDecisionQueue(shell, model, actions);
   renderPriorityProjects(shell, model, actions);
   renderProjectDetail(shell, model, actions);
-  renderMaintenanceStrip(shell, maintenance);
 }
 
 function renderPortfolioHealth(parent: HTMLElement, model: PortfolioModel): void {
@@ -110,16 +101,6 @@ function renderPriorityProjects(parent: HTMLElement, model: PortfolioModel, acti
   }
   const list = card.createDiv({ cls: "ts-priority-list" });
   for (const project of items) renderProjectCard(list, project, actions, false);
-}
-
-function renderMaintenanceStrip(parent: HTMLElement, counts: MaintenanceCounts): void {
-  const card = parent.createDiv({ cls: "ts-card ts-maintenance-strip" });
-  card.createDiv({ cls: "ts-card-label", text: "SYSTEM SIGNALS" });
-  const row = card.createDiv({ cls: "ts-maintenance-row" });
-  metric(row, String(counts.discoveryPending), "candidates");
-  metric(row, String(counts.onboardingPending), "onboarding");
-  metric(row, String(counts.materialsPending), "materials");
-  metric(row, String(counts.recentCount), "recent");
 }
 
 function renderProjectCard(parent: HTMLElement, project: ManagedProject, actions: PortfolioActions, focusCard: boolean): void {

@@ -41,12 +41,13 @@ import {
   type TodayFocusCoverage,
 } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
+import { DASHBOARD_PAGES, type DashboardPage } from "./components/page-switch";
 import { renderPortfolio } from "./components/portfolio";
+import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
-type DashboardPage = "today" | "projects";
 type TimelineFilter = "all" | TimelineKind;
 
 interface TodayMetrics {
@@ -204,8 +205,10 @@ export class DashboardView extends ItemView {
     const portfolio = await loadPortfolioModel(this.app);
     if (this.activePage === "today") {
       this.renderTodayPage(board, todos, projectBacklog, todayWorklog, portfolio);
+    } else if (this.activePage === "projects") {
+      this.renderProjectsPage(board, portfolio);
     } else {
-      this.renderProjectsPage(board, portfolio, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
+      this.renderSystemPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
     this.renderPageSwitch(contentEl);
 
@@ -268,26 +271,11 @@ export class DashboardView extends ItemView {
   private renderProjectsPage(
     board: HTMLElement,
     portfolio: PortfolioModel,
-    activity: DailyActivity[],
-    projectActivity: ProjectActivity[],
-    gitActivity: GitActivitySummary,
-    wsStats: WorkspaceStats[],
-    recent: RecentFile[],
-    products: ReturnType<typeof parseProducts>,
-    discovery: ProjectDiscoverySummary,
-    onboarding: ProjectOnboardingItem[],
-    materials: ProjectMaterialsItem[],
   ) {
     const portfolioCol = board.createDiv({ cls: "ts-board-col ts-portfolio-col" });
     renderPortfolio(
       portfolioCol,
       portfolio,
-      {
-        discoveryPending: discovery.pending.length,
-        onboardingPending: onboarding.filter(item => item.needsOnboarding).length,
-        materialsPending: materials.filter(item => item.needsImport).length,
-        recentCount: recent.length,
-      },
       {
         selectedProjectId: this.selectedProjectId,
         selectProject: projectId => {
@@ -298,13 +286,36 @@ export class DashboardView extends ItemView {
         openWorkspace: path => this.openWorkspace(path),
       },
     );
+  }
 
-    const maintenanceCol = board.createDiv({ cls: "ts-board-col ts-maintenance-col" });
-    const heatSec  = maintenanceCol.createDiv({ cls: "ts-card ts-compact-card ts-heatmap-card" });
+  private renderSystemPage(
+    board: HTMLElement,
+    activity: DailyActivity[],
+    projectActivity: ProjectActivity[],
+    gitActivity: GitActivitySummary,
+    wsStats: WorkspaceStats[],
+    recent: RecentFile[],
+    products: ReturnType<typeof parseProducts>,
+    discovery: ProjectDiscoverySummary,
+    onboarding: ProjectOnboardingItem[],
+    materials: ProjectMaterialsItem[],
+  ) {
+    const healthCol = board.createDiv({ cls: "ts-board-col ts-system-health-col" });
+    renderSystemHealth(healthCol, {
+      discoveryPending: discovery.pending.length,
+      onboardingPending: onboarding.filter(item => item.needsOnboarding).length,
+      materialsPending: materials.filter(item => item.needsImport).length,
+      recentCount: recent.length,
+      workspaceCount: wsStats.length,
+      gitRepoCount: gitActivity.repos.length,
+    });
+
+    const activityCol = board.createDiv({ cls: "ts-board-col ts-system-activity-col" });
+    const heatSec  = activityCol.createDiv({ cls: "ts-card ts-compact-card ts-heatmap-card" });
     if (this.snakeReplayTimer) { clearTimeout(this.snakeReplayTimer); this.snakeReplayTimer = null; }
     this.renderActivityDashboard(heatSec, activity, projectActivity, gitActivity);
 
-    const maintenanceGrid = maintenanceCol.createDiv({ cls: "ts-maintenance-grid" });
+    const maintenanceGrid = board.createDiv({ cls: "ts-board-col ts-system-grid ts-maintenance-grid" });
     const wsCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-workspaces-card" });
     wsCard.createDiv({ cls: "ts-card-label", text: "WORKSPACES" });
     this.renderWorkspaces(wsCard, wsStats);
@@ -324,11 +335,7 @@ export class DashboardView extends ItemView {
 
   private renderPageSwitch(parent: HTMLElement) {
     const switcher = parent.createDiv({ cls: "ts-page-switch" });
-    const pages: Array<{ id: DashboardPage; label: string; icon: string }> = [
-      { id: "today", label: "今日工作", icon: "calendar-check" },
-      { id: "projects", label: "项目系统", icon: "folder-kanban" },
-    ];
-    for (const page of pages) {
+    for (const page of DASHBOARD_PAGES) {
       const btn = switcher.createEl("button", {
         cls: `ts-page-btn ${this.activePage === page.id ? "is-active" : ""}`,
         attr: { "aria-label": page.label, title: page.label },

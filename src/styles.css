@@ -435,6 +435,9 @@
 .ts-materials-col { grid-area: materials; }
 .ts-portfolio-col { grid-area: portfolio; }
 .ts-maintenance-col { grid-area: maintenance; }
+.ts-system-health-col { grid-area: health; }
+.ts-system-activity-col { grid-area: activity; }
+.ts-system-grid { grid-area: maintenance; }
 
 .ts-board--today {
   grid-template-rows: 104px minmax(0, 1fr);
@@ -446,7 +449,14 @@
 .ts-board--projects {
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas:
-    "portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio maintenance maintenance maintenance maintenance";
+    "portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio portfolio";
+}
+
+.ts-board--system {
+  grid-template-rows: 132px minmax(0, 1fr);
+  grid-template-areas:
+    "health health health activity activity activity activity activity activity activity activity activity"
+    "maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance";
 }
 
 .ts-overview-card,
@@ -472,7 +482,7 @@
   grid-template-areas:
     "health health health health health health"
     "focus focus focus suggestions suggestions suggestions"
-    "risk risk priority priority system system"
+    "risk risk risk priority priority priority"
     "detail detail detail detail detail detail";
   gap: 8px;
   overflow: hidden;
@@ -483,7 +493,6 @@
 .ts-focus-suggestions-card { grid-area: suggestions; }
 .ts-risk-queue-card { grid-area: risk; }
 .ts-priority-card { grid-area: priority; }
-.ts-maintenance-strip { grid-area: system; }
 .ts-project-detail-card { grid-area: detail; }
 
 .ts-portfolio-health-card,
@@ -491,21 +500,15 @@
 .ts-focus-suggestions-card,
 .ts-risk-queue-card,
 .ts-priority-card,
-.ts-maintenance-strip,
 .ts-project-detail-card {
   display: flex;
   flex-direction: column;
 }
 
-.ts-portfolio-metrics,
-.ts-maintenance-row {
+.ts-portfolio-metrics {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
-}
-
-.ts-maintenance-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ts-portfolio-metric {
@@ -816,10 +819,56 @@
   white-space: nowrap;
 }
 
+.ts-system-health-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-system-health-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ts-system-health-metric {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 82%, var(--ts-panel) 18%);
+}
+
+.ts-system-health-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-family: var(--ts-mono);
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-system-health-label {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.1;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .ts-maintenance-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: minmax(96px, 1fr);
   gap: 8px;
   overflow: hidden;
@@ -3446,22 +3495,28 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--projects {
-    grid-template-rows: minmax(0, 1fr) 180px;
+    grid-template-rows: minmax(0, 1fr);
     grid-template-areas:
-      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "portfolio portfolio portfolio portfolio portfolio portfolio";
+  }
+
+  .ts-board--system {
+    grid-template-rows: auto minmax(180px, .75fr) minmax(0, 1fr);
+    grid-template-areas:
+      "health health health health health health"
+      "activity activity activity activity activity activity"
       "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto auto minmax(120px, 1fr) auto auto;
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
     grid-template-areas:
       "health health"
       "focus focus"
       "suggestions suggestions"
       "risk priority"
-      "detail detail"
-      "system system";
+      "detail detail";
     overflow-y: auto;
   }
 
@@ -3490,22 +3545,29 @@ body.theme-dark .ts-dash {
 @container (max-width: 720px) {
   .ts-board--projects {
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr) 180px;
+    grid-template-rows: minmax(0, 1fr);
     grid-template-areas:
-      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "portfolio portfolio portfolio portfolio portfolio portfolio";
+  }
+
+  .ts-board--system {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: auto minmax(180px, .75fr) minmax(0, 1fr);
+    grid-template-areas:
+      "health health health health health health"
+      "activity activity activity activity activity activity"
       "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto auto minmax(120px, 1fr) auto auto;
+    grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
     grid-template-areas:
       "health health"
       "focus focus"
       "suggestions suggestions"
       "risk priority"
-      "detail detail"
-      "system system";
+      "detail detail";
     overflow-y: auto;
   }
 
@@ -3537,9 +3599,16 @@ body.theme-dark .ts-dash {
   }
 
   .ts-board--projects {
-    grid-template-rows: minmax(0, 1fr) 180px;
+    grid-template-rows: minmax(0, 1fr);
     grid-template-areas:
-      "portfolio portfolio portfolio portfolio portfolio portfolio"
+      "portfolio portfolio portfolio portfolio portfolio portfolio";
+  }
+
+  .ts-board--system {
+    grid-template-rows: auto minmax(160px, .7fr) minmax(0, 1fr);
+    grid-template-areas:
+      "health health health health health health"
+      "activity activity activity activity activity activity"
       "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
@@ -3553,15 +3622,14 @@ body.theme-dark .ts-dash {
 
   .ts-portfolio {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto;
     grid-template-areas:
       "health"
       "focus"
       "suggestions"
       "risk"
       "priority"
-      "detail"
-      "system";
+      "detail";
   }
 
   .ts-detail-grid,
@@ -3579,6 +3647,7 @@ body.theme-dark .ts-dash {
   }
 
   .ts-portfolio-metrics,
+  .ts-system-health-grid,
   .ts-maintenance-grid {
     grid-template-columns: 1fr;
   }
