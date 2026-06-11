@@ -70,6 +70,7 @@ export interface TimelineItem {
   badge: string;
 }
 export interface TodayWorklog    { highlights: string[]; todos: TodoItem[]; entries: WorklogEntry[]; outputs: WorklogOutput[]; events: WorklogEvent[]; timeline: TimelineItem[]; }
+export interface WeeklyWorklog   { date: string; path: string; worklog: TodayWorklog; }
 export interface ProjectBacklogItem { text: string; project: string; path: string; source: string; }
 
 const PROJECT_UNFINISHED_NAME = "未完成事项.md";
@@ -380,6 +381,20 @@ function startOfLocalDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function isoWeekStart(date: Date): Date {
+  const d = startOfLocalDay(date);
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  return d;
+}
+
+function dateFromCompact(compact: string): Date | null {
+  const match = compact.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : startOfLocalDay(date);
 }
 
 export async function getVaultStats(app: App): Promise<VaultStats> {
@@ -931,6 +946,45 @@ export async function loadTodayWorklog(app: App): Promise<TodayWorklog | null> {
     ]);
     return { highlights, todos, entries, outputs, events, timeline };
   } catch { return null; }
+}
+
+export async function loadWeeklyWorklogs(app: App, now = new Date()): Promise<WeeklyWorklog[]> {
+  const dir = "02-日记/工作日志";
+  const listing = await app.vault.adapter.list(dir).catch(() => null);
+  if (!listing) return [];
+
+  const start = isoWeekStart(now);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const worklogs: WeeklyWorklog[] = [];
+
+  for (const path of listing.files.sort()) {
+    if (!path.toLowerCase().endsWith(".md")) continue;
+    const compact = worklogDateFromPath(path);
+    if (!compact) continue;
+    const date = dateFromCompact(compact);
+    if (!date || date < start || date > end) continue;
+
+    const md = await app.vault.adapter.read(path).catch(() => "");
+    if (!md) continue;
+    const dateStr = localDateStr(date);
+    const highlights = parseHighlights(md);
+    const todos = parseTodosFromMd(md);
+    const entries = parseWorklogEntries(md);
+    const outputs = parseWorklogOutputs(md);
+    const events = parseWorklogEvents(md);
+    const timeline = mergeTimelineItems([
+      ...buildWorklogTimelineItems(path, dateStr, entries, outputs, events),
+      ...await loadStructuredTimelineItems(app, path, compact, dateStr),
+    ]);
+    worklogs.push({
+      date: dateStr,
+      path,
+      worklog: { highlights, todos, entries, outputs, events, timeline },
+    });
+  }
+
+  return worklogs;
 }
 
 async function findTodayWorklogPath(app: App, todayCompact: string): Promise<string | null> {

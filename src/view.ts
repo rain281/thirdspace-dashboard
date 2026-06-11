@@ -5,7 +5,7 @@ import {
   loadProductStatus, parseProducts, getRecentFiles,
   getProjectActivity, getGitActivity,
   localDateStr, localDateCompact, localTimestamp,
-  loadTodos, loadTodayWorklog, getVaultStats, getTodayWorklogPath,
+  loadTodos, loadTodayWorklog, loadWeeklyWorklogs, getVaultStats, getTodayWorklogPath,
   ensureTodayWorklog, addTodoToWorklog, toggleTodoInWorklog, renameTodoInWorklog, archiveCompletedTodosInWorklog,
   archiveStaleTodosToProjectBacklog,
   loadProjectBacklog, promoteProjectBacklogItemToToday,
@@ -42,9 +42,11 @@ import {
 } from "./data/project-management";
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { DASHBOARD_PAGES, type DashboardPage } from "./components/page-switch";
+import { deriveWeeklyReview } from "./data/weekly-review";
 import { renderPortfolio } from "./components/portfolio";
 import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
+import { renderWeeklyReview } from "./components/weekly-review";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
@@ -156,7 +158,7 @@ export class DashboardView extends ItemView {
     contentEl.addClass("ts-dash");
     await this.archiveStaleTodosFromOldWorklogs();
 
-    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, discovery, onboarding, materials] = await Promise.all([
+    const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, weeklyWorklogs, discovery, onboarding, materials] = await Promise.all([
       loadWorkspaceIndex(this.app),
       loadProductStatus(this.app),
       getDailyActivity(this.app, 365),
@@ -165,6 +167,7 @@ export class DashboardView extends ItemView {
       loadTodos(this.app),
       loadProjectBacklog(this.app),
       loadTodayWorklog(this.app),
+      loadWeeklyWorklogs(this.app),
       refreshProjectDiscovery(this.app),
       loadProjectOnboarding(this.app),
       loadProjectMaterials(this.app),
@@ -207,6 +210,8 @@ export class DashboardView extends ItemView {
       this.renderTodayPage(board, todos, projectBacklog, todayWorklog, portfolio);
     } else if (this.activePage === "projects") {
       this.renderProjectsPage(board, portfolio);
+    } else if (this.activePage === "review") {
+      this.renderReviewPage(board, portfolio, weeklyWorklogs);
     } else {
       this.renderSystemPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials);
     }
@@ -286,6 +291,15 @@ export class DashboardView extends ItemView {
         openWorkspace: path => this.openWorkspace(path),
       },
     );
+  }
+
+  private renderReviewPage(
+    board: HTMLElement,
+    portfolio: PortfolioModel,
+    weeklyWorklogs: Awaited<ReturnType<typeof loadWeeklyWorklogs>>,
+  ) {
+    const review = deriveWeeklyReview(portfolio, weeklyWorklogs);
+    renderWeeklyReview(board, review);
   }
 
   private renderSystemPage(

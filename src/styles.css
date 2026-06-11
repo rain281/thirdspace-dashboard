@@ -438,6 +438,12 @@
 .ts-system-health-col { grid-area: health; }
 .ts-system-activity-col { grid-area: activity; }
 .ts-system-grid { grid-area: maintenance; }
+.ts-review-summary-col { grid-area: summary; }
+.ts-review-focus-col { grid-area: focus; }
+.ts-review-outcomes-col { grid-area: outcomes; }
+.ts-review-offfocus-col { grid-area: offfocus; }
+.ts-review-risks-col { grid-area: risks; }
+.ts-review-next-col { grid-area: next; }
 
 .ts-board--today {
   grid-template-rows: 104px minmax(0, 1fr);
@@ -459,6 +465,14 @@
     "maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance maintenance";
 }
 
+.ts-board--review {
+  grid-template-rows: 112px minmax(0, .95fr) minmax(0, .95fr);
+  grid-template-areas:
+    "summary summary summary summary focus focus focus focus focus focus focus focus"
+    "outcomes outcomes outcomes outcomes outcomes offfocus offfocus offfocus risks risks risks risks"
+    "next next next next next next next next risks risks risks risks";
+}
+
 .ts-overview-card,
 .ts-heatmap-card,
 .ts-workspaces-card,
@@ -471,6 +485,171 @@
 .ts-materials-card {
   height: 100%;
   overflow: hidden;
+}
+
+.ts-review-summary-card,
+.ts-review-section {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-review-metrics {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ts-review-metric {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 83%, var(--ts-panel) 17%);
+}
+
+.ts-review-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-family: var(--ts-mono);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-review-metric-label {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ts-text-3);
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ts-review-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ts-review-list--compact {
+  gap: 5px;
+}
+
+.ts-review-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(54px, .28fr) minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  padding: 7px 8px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 86%, var(--ts-panel) 14%);
+}
+
+.ts-review-row--focus.is-moving {
+  border-color: color-mix(in srgb, var(--ts-ok) 34%, var(--ts-border) 66%);
+}
+
+.ts-review-row--focus.is-stalled,
+.ts-review-row--offfocus,
+.ts-review-row--reconsider {
+  border-color: color-mix(in srgb, var(--ts-warn) 38%, var(--ts-border) 62%);
+}
+
+.ts-review-row--watch {
+  border-color: color-mix(in srgb, var(--ts-accent) 28%, var(--ts-border) 72%);
+}
+
+.ts-review-badge {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 5px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  color: var(--ts-text-2);
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--ts-accent) 8%, var(--background-primary) 92%);
+}
+
+.ts-review-info {
+  min-width: 0;
+}
+
+.ts-review-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-review-sub {
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--ts-text-3);
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-review-mini-section {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.ts-review-mini-section + .ts-review-mini-section {
+  margin-top: 8px;
+}
+
+.ts-review-mini-head {
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.1;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ts-review-next-summary {
+  margin-bottom: 7px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--ts-accent) 28%, var(--ts-border) 72%);
+  border-radius: var(--ts-radius-sm);
+  color: var(--ts-text);
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 750;
+  background: color-mix(in srgb, var(--ts-accent) 9%, var(--background-primary) 91%);
+}
+
+.ts-review-empty {
+  font-size: 9px;
 }
 
 .ts-portfolio {
@@ -3508,6 +3687,17 @@ body.theme-dark .ts-dash {
       "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
+  .ts-board--review {
+    grid-template-rows: auto minmax(140px, .8fr) minmax(0, 1fr) minmax(112px, .55fr) minmax(0, 1fr) minmax(120px, .7fr);
+    grid-template-areas:
+      "summary summary summary summary summary summary"
+      "focus focus focus focus focus focus"
+      "outcomes outcomes outcomes outcomes outcomes outcomes"
+      "offfocus offfocus offfocus offfocus offfocus offfocus"
+      "risks risks risks risks risks risks"
+      "next next next next next next";
+  }
+
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
@@ -3531,6 +3721,10 @@ body.theme-dark .ts-dash {
   .ts-maintenance-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: minmax(100px, 1fr);
+  }
+
+  .ts-review-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .ts-stats-row {
@@ -3559,6 +3753,18 @@ body.theme-dark .ts-dash {
       "maintenance maintenance maintenance maintenance maintenance maintenance";
   }
 
+  .ts-board--review {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: auto minmax(140px, .8fr) minmax(0, 1fr) minmax(112px, .55fr) minmax(0, 1fr) minmax(120px, .7fr);
+    grid-template-areas:
+      "summary summary summary summary summary summary"
+      "focus focus focus focus focus focus"
+      "outcomes outcomes outcomes outcomes outcomes outcomes"
+      "offfocus offfocus offfocus offfocus offfocus offfocus"
+      "risks risks risks risks risks risks"
+      "next next next next next next";
+  }
+
   .ts-portfolio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
@@ -3582,6 +3788,10 @@ body.theme-dark .ts-dash {
   .ts-maintenance-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: minmax(100px, 1fr);
+  }
+
+  .ts-review-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -3610,6 +3820,18 @@ body.theme-dark .ts-dash {
       "health health health health health health"
       "activity activity activity activity activity activity"
       "maintenance maintenance maintenance maintenance maintenance maintenance";
+  }
+
+  .ts-board--review {
+    grid-template-rows: auto auto auto auto auto auto;
+    grid-template-areas:
+      "summary summary summary summary summary summary"
+      "focus focus focus focus focus focus"
+      "outcomes outcomes outcomes outcomes outcomes outcomes"
+      "offfocus offfocus offfocus offfocus offfocus offfocus"
+      "risks risks risks risks risks risks"
+      "next next next next next next";
+    overflow-y: auto;
   }
 
   .ts-stats-row {
@@ -3648,7 +3870,12 @@ body.theme-dark .ts-dash {
 
   .ts-portfolio-metrics,
   .ts-system-health-grid,
+  .ts-review-metrics,
   .ts-maintenance-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ts-review-row {
+    grid-template-columns: minmax(48px, .34fr) minmax(0, 1fr);
   }
 }
