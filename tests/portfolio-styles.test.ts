@@ -24,6 +24,19 @@ assert.match(styles, /\.ts-review-next-col\s*\{\s*grid-area:\s*next;/);
 assert.match(styles, /\.ts-board--projects-detail/);
 assert.match(styles, /\.ts-project-detail-page/);
 assert.match(styles, /\.ts-detail-back-btn/);
+assert.match(styles, /\.ts-detail-identity\s*\{/);
+assert.match(styles, /\.ts-detail-chips\s*\{/);
+assert.match(styles, /\.ts-detail-chip\s*\{/);
+assert.match(styles, /\.ts-detail-main\s*\{/);
+assert.match(styles, /\.ts-detail-risk-panel\s*\{/);
+assert.match(styles, /\.ts-detail-context-panel\s*\{/);
+assert.match(styles, /\.ts-detail-action-panel\s*\{/);
+assert.match(styles, /\.ts-detail-summary-list\s*\{/);
+assert.match(styles, /\.ts-detail-summary-item--pending/);
+assert.match(styles, /\.ts-detail-summary-item--done/);
+assert.match(styles, /\.ts-detail-link-row\.is-muted/);
+assert.match(styles, /@container\s*\(max-width:\s*720px\)\s*\{[\s\S]*\.ts-detail-grid[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+assert.match(styles, /@container\s*\(max-width:\s*520px\)\s*\{[\s\S]*\.ts-detail-grid[\s\S]*grid-template-columns:\s*1fr/);
 assert.match(styles, /@container\s*\(max-width:\s*720px\)\s*\{[\s\S]*\.ts-board--system[\s\S]*health[\s\S]*activity[\s\S]*maintenance/);
 
 function cssBlock(selector: string): string {
