@@ -151,6 +151,7 @@ assert.match(text, /发布门禁未关闭/);
 assert.match(text, /确认首屏密度/);
 assert.match(text, /npm run build/);
 assert.doesNotMatch(text, /SYSTEM SIGNALS/);
+assert.doesNotMatch(text, /PROJECT DETAIL/);
 
 parent.findByClass("ts-focus-confirm-btn")?.click();
 assert.equal(confirmedFocus, 1);
@@ -222,64 +223,22 @@ renderPortfolio(
 
 assert.match(pendingFocusParent.textContent(), /Weekly Focus pending confirmation/);
 
-const selected: string[] = [];
-const detailOpened: string[] = [];
-const workspaceOpened: string[] = [];
-const detailActions: Array<[string, string]> = [];
+const openedDetail: string[] = [];
+const routeOpened: string[] = [];
 const detailParent = new FakeElement();
 renderPortfolio(
   detailParent as unknown as HTMLElement,
   populatedPortfolio,
   {
-    selectedProjectId: "kora",
-    selectProject: id => selected.push(id),
-    openFile: path => detailOpened.push(path),
-    openWorkspace: path => workspaceOpened.push(path),
-    projectDetailAction: (projectId, action) => detailActions.push([projectId, action]),
+    openProjectDetail: id => openedDetail.push(id),
+    openFile: path => routeOpened.push(path),
   },
 );
 
 const detailText = detailParent.textContent();
-assert.match(detailText, /PROJECT DETAIL/);
+assert.doesNotMatch(detailText, /PROJECT DETAIL/);
 assert.match(detailText, /Kora/);
-assert.match(detailText, /Goal/);
-assert.match(detailText, /构建本地工作台/);
-assert.match(detailText, /Success/);
-assert.match(detailText, /能判断今日推进事项/);
-assert.match(detailText, /Milestone/);
-assert.match(detailText, /M2 Portfolio/);
-assert.match(detailText, /Next Step/);
-assert.match(detailText, /完成只读 Portfolio/);
-assert.match(detailText, /更新下一步/);
-assert.match(detailText, /新增风险/);
-assert.match(detailText, /新增待决策/);
-assert.match(detailText, /Quick Links/);
-assert.match(detailText, /状态笔记/);
-assert.match(detailText, /首页/);
-assert.match(detailText, /上下文/);
-assert.match(detailText, /仓库/);
 
 detailParent.findByClass("ts-project-card")?.click();
-assert.deepEqual(selected, ["kora"]);
-assert.deepEqual(detailOpened, []);
-
-detailParent.findByClass("ts-detail-action--next-step")?.click();
-detailParent.findByClass("ts-detail-action--risk")?.click();
-detailParent.findByClass("ts-detail-action--decision")?.click();
-assert.deepEqual(detailActions, [
-  ["kora", "next-step"],
-  ["kora", "risk"],
-  ["kora", "decision"],
-]);
-
-detailParent
-  .findAllByClass("ts-detail-link-row")
-  .find(element => /状态笔记/.test(element.textContent()))
-  ?.click();
-assert.deepEqual(detailOpened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
-
-detailParent
-  .findAllByClass("ts-detail-link-row")
-  .find(element => /工作区/.test(element.textContent()))
-  ?.click();
-assert.deepEqual(workspaceOpened, ["04-项目/产品系统/Kora"]);
+assert.deepEqual(openedDetail, ["kora"]);
+assert.deepEqual(routeOpened, []);
