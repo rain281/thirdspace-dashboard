@@ -10,6 +10,7 @@ import "./write-preview-modal.test";
 import "./project-discovery.test";
 import "./dashboard-operation-preview.test";
 import "./portfolio-renderer.test";
+import "./project-detail-renderer.test";
 import "./portfolio-styles.test";
 import "./vault-reader.test";
 
