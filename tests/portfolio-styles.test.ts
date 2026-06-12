@@ -21,6 +21,9 @@ assert.match(styles, /\.ts-maintenance-grid\s*\{[\s\S]*display:\s*grid;/);
 assert.match(styles, /\.ts-review-summary-col\s*\{\s*grid-area:\s*summary;/);
 assert.match(styles, /\.ts-review-focus-col\s*\{\s*grid-area:\s*focus;/);
 assert.match(styles, /\.ts-review-next-col\s*\{\s*grid-area:\s*next;/);
+assert.match(styles, /\.ts-board--projects-detail/);
+assert.match(styles, /\.ts-project-detail-page/);
+assert.match(styles, /\.ts-detail-back-btn/);
 assert.match(styles, /@container\s*\(max-width:\s*720px\)\s*\{[\s\S]*\.ts-board--system[\s\S]*health[\s\S]*activity[\s\S]*maintenance/);
 
 function cssBlock(selector: string): string {

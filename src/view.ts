@@ -62,6 +62,7 @@ import {
 } from "./data/dashboard-operation-preview";
 import { createWeeklyReviewWritePreview, deriveWeeklyReview, weeklyPlanPath } from "./data/weekly-review";
 import { renderPortfolio } from "./components/portfolio";
+import { renderProjectDetailPage } from "./components/project-detail";
 import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
 import { renderWeeklyReview } from "./components/weekly-review";
@@ -220,6 +221,7 @@ export class DashboardView extends ItemView {
   private activePage: DashboardPage = "today";
   private timelineFilter: TimelineFilter = "all";
   private selectedProjectId: string | null = null;
+  private projectsViewMode: "portfolio" | "detail" = "portfolio";
   private snakeRouteCache: SnakeRouteCache | null = null;
   private snakeReplayTimer: number | null = null;
   private readonly singleScreenLimit = {
@@ -378,14 +380,32 @@ export class DashboardView extends ItemView {
     board: HTMLElement,
     portfolio: PortfolioModel,
   ) {
+    if (this.projectsViewMode === "detail") {
+      board.addClass("ts-board--projects-detail");
+      const project = portfolio.projects.find(item => item.id === this.selectedProjectId) ?? null;
+      renderProjectDetailPage(board, project, {
+        backToPortfolio: () => {
+          this.projectsViewMode = "portfolio";
+          void this.render();
+        },
+        openFile: path => this.openFile(path),
+        openWorkspace: path => this.openWorkspace(path),
+        projectDetailAction: (projectId, action) => {
+          void this.openProjectDetailActionModal(portfolio, projectId, action);
+        },
+      });
+      return;
+    }
+
     const portfolioCol = board.createDiv({ cls: "ts-board-col ts-portfolio-col" });
     renderPortfolio(
       portfolioCol,
       portfolio,
       {
         selectedProjectId: this.selectedProjectId,
-        selectProject: projectId => {
+        openProjectDetail: projectId => {
           this.selectedProjectId = projectId;
+          this.projectsViewMode = "detail";
           void this.render();
         },
         openFile: path => this.openFile(path),
@@ -403,9 +423,6 @@ export class DashboardView extends ItemView {
             existingWeeklyPlan,
           });
           this.confirmAndApplyWrites([previews.yaml, previews.weeklyPlan]);
-        },
-        projectDetailAction: (projectId, action) => {
-          void this.openProjectDetailActionModal(portfolio, projectId, action);
         },
       },
     );

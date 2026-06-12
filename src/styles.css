@@ -674,12 +674,11 @@
   height: 100%;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: auto minmax(0, .85fr) minmax(0, .85fr) minmax(130px, .8fr);
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
     "health health health health health health"
     "focus focus focus suggestions suggestions suggestions"
-    "risk risk risk priority priority priority"
-    "detail detail detail detail detail detail";
+    "risk risk risk priority priority priority";
   gap: 8px;
   overflow: hidden;
 }
@@ -689,14 +688,11 @@
 .ts-focus-suggestions-card { grid-area: suggestions; }
 .ts-risk-queue-card { grid-area: risk; }
 .ts-priority-card { grid-area: priority; }
-.ts-project-detail-card { grid-area: detail; }
-
 .ts-portfolio-health-card,
 .ts-weekly-focus-card,
 .ts-focus-suggestions-card,
 .ts-risk-queue-card,
-.ts-priority-card,
-.ts-project-detail-card {
+.ts-priority-card {
   display: flex;
   flex-direction: column;
 }
@@ -857,6 +853,69 @@
 
 .ts-health--healthy .ts-project-health {
   color: color-mix(in srgb, var(--ts-green) 76%, var(--ts-text) 24%);
+}
+
+.ts-board--projects-detail {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas: "detail detail detail detail detail detail detail detail detail detail detail detail";
+}
+
+.ts-board--projects-detail > .ts-project-detail-page {
+  grid-area: detail;
+}
+
+.ts-project-detail-page {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.ts-detail-route-head {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ts-detail-route-head .ts-card-label {
+  margin-bottom: 0;
+}
+
+.ts-detail-back-btn {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 0;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--ts-panel) 16%);
+  box-shadow: none;
+  color: var(--ts-text-2);
+  font-family: var(--ts-font);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ts-detail-back-btn:hover {
+  border-color: var(--ts-border-strong);
+  color: var(--ts-accent);
+  background: color-mix(in srgb, var(--ts-accent) 9%, var(--background-primary) 91%);
+}
+
+.ts-project-detail-page > .ts-project-detail-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .ts-detail-hero {
