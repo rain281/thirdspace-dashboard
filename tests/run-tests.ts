@@ -7,6 +7,8 @@ import "./today-execution.test";
 import "./today-execution-renderer.test";
 import "./controlled-write.test";
 import "./write-preview-modal.test";
+import "./project-discovery.test";
+import "./dashboard-operation-preview.test";
 import "./portfolio-renderer.test";
 import "./portfolio-styles.test";
 import "./vault-reader.test";

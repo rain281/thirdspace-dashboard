@@ -114,6 +114,33 @@ export async function refreshProjectDiscovery(app: App): Promise<ProjectDiscover
   }
 }
 
+export async function loadProjectDiscoverySnapshot(app: App): Promise<ProjectDiscoverySummary> {
+  const generatedAt = localTimestamp(new Date());
+  try {
+    const [configRaw, queue] = await Promise.all([
+      readAdapterFile(app, PROJECT_DISCOVERY_CONFIG_PATH),
+      loadQueue(app),
+    ]);
+    const config = configRaw ? parseDiscoveryConfig(configRaw) : null;
+    return summarizeQueue({
+      ...queue,
+      roots: queue.roots.length > 0 ? queue.roots : config?.roots ?? DEFAULT_ROOTS,
+      include_paths: queue.include_paths ?? config?.includePaths ?? [],
+    });
+  } catch (error) {
+    return {
+      roots: DEFAULT_ROOTS,
+      pending: [],
+      accepted: [],
+      ignored: [],
+      notePath: PROJECT_DISCOVERY_INBOX_PATH,
+      queuePath: PROJECT_DISCOVERY_QUEUE_PATH,
+      generatedAt,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function acceptProjectCandidate(app: App, candidateId: string): Promise<ProjectCandidate | null> {
   const queue = await loadQueue(app);
   const candidate = queue.candidates.find(item => item.id === candidateId && item.status === "pending");

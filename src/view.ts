@@ -6,8 +6,7 @@ import {
   getProjectActivity, getGitActivity,
   localDateStr, localDateCompact, localTimestamp,
   loadTodos, loadTodayWorklog, loadWeeklyWorklogs, getVaultStats, getTodayWorklogPath,
-  ensureTodayWorklog, addTodoToWorklog, toggleTodoInWorklog, renameTodoInWorklog, archiveCompletedTodosInWorklog,
-  archiveStaleTodosToProjectBacklog,
+  ensureTodayWorklog, addTodoToWorklog, toggleTodoInWorklog, renameTodoInWorklog,
   loadProjectBacklog, promoteProjectBacklogItemToToday,
   type WorkspaceStats, type TodoItem, type VaultStats, type TodayWorklog,
   type DailyActivity, type ProjectActivity, type GitActivitySummary,
@@ -17,7 +16,7 @@ import {
   PROJECT_DISCOVERY_INBOX_PATH,
   acceptProjectCandidate,
   ignoreProjectCandidate,
-  refreshProjectDiscovery,
+  loadProjectDiscoverySnapshot,
   type ProjectCandidate,
   type ProjectDiscoverySummary,
 } from "./data/project-discovery";
@@ -50,6 +49,17 @@ import {
 import { buildSnakeCells, type SnakeCell } from "./data/worklog-parser";
 import { DASHBOARD_PAGES, type DashboardPage } from "./components/page-switch";
 import { applyControlledWritePreview, type ControlledWritePreview } from "./data/controlled-write";
+import {
+  createDiscoveryCandidateOperationPreview,
+  createMaterialsOperationPreview,
+  createNewNoteOperationPreview,
+  createOnboardingOperationPreview,
+  createPromoteBacklogOperationPreview,
+  createTodayWorklogOperationPreview,
+  createTodoAddOperationPreview,
+  createTodoRenameOperationPreview,
+  createTodoToggleOperationPreview,
+} from "./data/dashboard-operation-preview";
 import { createWeeklyReviewWritePreview, deriveWeeklyReview, weeklyPlanPath } from "./data/weekly-review";
 import { renderPortfolio } from "./components/portfolio";
 import { renderSystemHealth } from "./components/system-health";
@@ -207,8 +217,6 @@ export class DashboardView extends ItemView {
   plugin: ThirdSpaceDashboard;
   private timer: number | null = null;
   private liveRenderTimer: number | null = null;
-  private archivingCompletedTodos = false;
-  private archivingStaleTodos = false;
   private activePage: DashboardPage = "today";
   private timelineFilter: TimelineFilter = "all";
   private selectedProjectId: string | null = null;
@@ -249,7 +257,6 @@ export class DashboardView extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("ts-dash");
-    await this.archiveStaleTodosFromOldWorklogs();
 
     const [wsIndex, productMd, activity, projectActivity, gitActivity, todos, projectBacklog, todayWorklog, weeklyWorklogs, discovery, onboarding, materials] = await Promise.all([
       loadWorkspaceIndex(this.app),
@@ -261,7 +268,7 @@ export class DashboardView extends ItemView {
       loadProjectBacklog(this.app),
       loadTodayWorklog(this.app),
       loadWeeklyWorklogs(this.app),
-      refreshProjectDiscovery(this.app),
+      loadProjectDiscoverySnapshot(this.app),
       loadProjectOnboarding(this.app),
       loadProjectMaterials(this.app),
     ]);
@@ -735,11 +742,13 @@ export class DashboardView extends ItemView {
 
   private async runNextAction(action: NextAction, button: HTMLButtonElement) {
     if (action.target === "project" && action.projectItem) {
-      button.disabled = true;
-      button.setText("加入中");
-      await promoteProjectBacklogItemToToday(this.app, action.projectItem);
-      new Notice(`${action.projectItem.project} 已加入今日 Todo`);
-      await this.render();
+      const item = action.projectItem;
+      this.confirmAndRunOperation(createPromoteBacklogOperationPreview(item), async () => {
+        button.disabled = true;
+        button.setText("加入中");
+        await promoteProjectBacklogItemToToday(this.app, item);
+        new Notice(`${item.project} 已加入今日 Todo`);
+      });
       return;
     }
     await this.openTodayLog();
@@ -763,12 +772,12 @@ export class DashboardView extends ItemView {
     const actions = row.createDiv({ cls: "ts-backlog-actions" });
     const today = actions.createEl("button", { cls: "ts-backlog-btn ts-backlog-btn--primary", text: "今日" });
     today.addEventListener("click", async () => {
-      today.disabled = true;
-      today.setText("加入中");
-      await promoteProjectBacklogItemToToday(this.app, item);
-      new Notice(`${item.project} 已加入今日 Todo`);
-      await this.refreshTodoSection();
-      await this.render();
+      this.confirmAndRunOperation(createPromoteBacklogOperationPreview(item), async () => {
+        today.disabled = true;
+        today.setText("加入中");
+        await promoteProjectBacklogItemToToday(this.app, item);
+        new Notice(`${item.project} 已加入今日 Todo`);
+      });
     });
     const open = actions.createEl("button", { cls: "ts-backlog-btn", text: "打开" });
     open.addEventListener("click", () => this.openFile(item.path));
@@ -846,26 +855,11 @@ export class DashboardView extends ItemView {
     // checkbox 单击 = 切换完成状态（原地更新，无全页刷新）
     chk.addEventListener("click", async e => {
       e.stopPropagation();
-      // 乐观更新：先改 DOM，再写文件
-      item.done = !item.done;
-      chk.setAttr("aria-label", item.done ? "Mark todo incomplete" : "Mark todo complete");
-      setIcon(chk, item.done ? "check-square" : "square");
-      if (item.done) row.addClass("ts-todo-done");
-      else           row.removeClass("ts-todo-done");
-      // 同步更新 header 上的 pending 计数
-      const todoCard = row.closest<HTMLElement>(".ts-todo-card");
-      if (todoCard) {
-        const meta = todoCard.querySelector<HTMLElement>(".ts-todo-meta");
-        if (meta) {
-          const pendingCount = todoCard.querySelectorAll<HTMLElement>(".ts-todo-row:not(.ts-todo-done)").length;
-          meta.setText(pendingCount > 0 ? `${pendingCount} pending` : "");
-        }
-      }
-      await toggleTodoInWorklog(this.app, item);
-      if (item.done) {
-        this.showTodoArchiveToast(item.text);
-        await this.refreshTodoSection();
-      }
+      const nextDone = !item.done;
+      this.confirmAndRunOperation(createTodoToggleOperationPreview(item, nextDone), async () => {
+        await toggleTodoInWorklog(this.app, { ...item, done: nextDone });
+        new Notice(nextDone ? "Todo 已归档到今日产出" : "Todo 已恢复为未完成");
+      });
     });
 
     // 单击行 = 打开文件（detail >= 2 时忽略，让 dblclick 接管）
@@ -897,8 +891,11 @@ export class DashboardView extends ItemView {
         saved = true;
         const newText = input.value.trim();
         if (newText && newText !== item.text) {
-          await renameTodoInWorklog(this.app, item, newText);
-          item.text = newText;
+          this.confirmAndRunOperation(createTodoRenameOperationPreview(item, newText), async () => {
+            await renameTodoInWorklog(this.app, item, newText);
+            item.text = newText;
+            new Notice("Todo 已重命名");
+          });
         }
         // 原地恢复任务展示，无全页刷新
         renderTodoText();
@@ -1430,16 +1427,18 @@ export class DashboardView extends ItemView {
     const actions = row.createDiv({ cls: "ts-discovery-actions" });
     const accept = actions.createEl("button", { cls: "ts-discovery-btn ts-discovery-btn--primary", text: "纳入" });
     accept.addEventListener("click", async () => {
-      const accepted = await acceptProjectCandidate(this.app, candidate.id);
-      new Notice(accepted ? `已纳入 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
-      await this.render();
+      this.confirmAndRunOperation(createDiscoveryCandidateOperationPreview(candidate, "accept"), async () => {
+        const accepted = await acceptProjectCandidate(this.app, candidate.id);
+        new Notice(accepted ? `已纳入 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
+      });
     });
 
     const ignore = actions.createEl("button", { cls: "ts-discovery-btn", text: "忽略" });
     ignore.addEventListener("click", async () => {
-      const ignored = await ignoreProjectCandidate(this.app, candidate.id);
-      new Notice(ignored ? `已忽略 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
-      await this.render();
+      this.confirmAndRunOperation(createDiscoveryCandidateOperationPreview(candidate, "ignore"), async () => {
+        const ignored = await ignoreProjectCandidate(this.app, candidate.id);
+        new Notice(ignored ? `已忽略 ${candidate.name}` : `未找到待确认项目：${candidate.name}`);
+      });
     });
   }
 
@@ -1461,15 +1460,16 @@ export class DashboardView extends ItemView {
       const actions = row.createDiv({ cls: "ts-discovery-actions" });
       const connect = actions.createEl("button", { cls: "ts-discovery-btn ts-discovery-btn--primary", text: "接入" });
       connect.addEventListener("click", async () => {
-        connect.disabled = true;
-        connect.setText("接入中");
-        const result = await runProjectOnboarding(this.app, item.id);
-        if (result) {
-          new Notice(`${item.name} 接入完成：hook=${result.hookStatus}，history=${result.historyStatus}`);
-        } else {
-          new Notice(`未找到待接入项目：${item.name}`);
-        }
-        await this.render();
+        this.confirmAndRunOperation(createOnboardingOperationPreview(item), async () => {
+          connect.disabled = true;
+          connect.setText("接入中");
+          const result = await runProjectOnboarding(this.app, item.id);
+          if (result) {
+            new Notice(`${item.name} 接入完成：hook=${result.hookStatus}，history=${result.historyStatus}`);
+          } else {
+            new Notice(`未找到待接入项目：${item.name}`);
+          }
+        });
       });
     }
     if (onboarding.length > 4) list.createDiv({ cls: "ts-inline-more", text: `+ ${onboarding.length - 4} more onboarding items` });
@@ -1514,15 +1514,16 @@ export class DashboardView extends ItemView {
       text: item.needsImport ? (item.importedCount > 0 ? "更新索引" : "建索引") : "重扫索引",
     });
     importBtn.addEventListener("click", async () => {
-      importBtn.disabled = true;
-      importBtn.setText(item.needsImport ? "索引中" : "重扫中");
-      const result = await runProjectMaterialsImport(this.app, item.id);
-      if (result) {
-        new Notice(`${item.name} 资料索引完成：${result.indexedCount} files，快照 0`);
-      } else {
-        new Notice(`未找到资料索引项目：${item.name}`);
-      }
-      await this.render();
+      this.confirmAndRunOperation(createMaterialsOperationPreview(item), async () => {
+        importBtn.disabled = true;
+        importBtn.setText(item.needsImport ? "索引中" : "重扫中");
+        const result = await runProjectMaterialsImport(this.app, item.id);
+        if (result) {
+          new Notice(`${item.name} 资料索引完成：${result.indexedCount} files，快照 0`);
+        } else {
+          new Notice(`未找到资料索引项目：${item.name}`);
+        }
+      });
     });
   }
 
@@ -1608,17 +1609,39 @@ export class DashboardView extends ItemView {
     const ts   = localTimestamp(now);
     const path = `01-收件箱/${date}_untitled.md`;
     const fm   = ["---",`title: "Untitled"`,`type: note`,`topic: work`,`workspace: "01-收件箱"`,`created: "${ts}"`,`modified: "${ts}"`,`tags: ["note","draft"]`,`source: manual`,`status: draft`,"---","",""].join("\n");
-    try { const f = await this.app.vault.create(path, fm); await this.app.workspace.getLeaf(false).openFile(f); }
-    catch { const f = this.app.vault.getAbstractFileByPath(path) as TFile|null; if (f) await this.app.workspace.getLeaf(false).openFile(f); }
+    const existing = this.app.vault.getAbstractFileByPath(path) as TFile | null;
+    if (existing) {
+      await this.app.workspace.getLeaf(false).openFile(existing);
+      return;
+    }
+    this.confirmAndRunOperation(createNewNoteOperationPreview(path, fm), async () => {
+      try {
+        const f = await this.app.vault.create(path, fm);
+        await this.app.workspace.getLeaf(false).openFile(f);
+      } catch {
+        const f = this.app.vault.getAbstractFileByPath(path) as TFile|null;
+        if (f) await this.app.workspace.getLeaf(false).openFile(f);
+      }
+    }, { refresh: false });
   }
   private async openTodayLog() {
-    const f = await ensureTodayWorklog(this.app);
-    await this.app.workspace.getLeaf(false).openFile(f);
+    const path = getTodayWorklogPath();
+    const existing = this.app.vault.getAbstractFileByPath(path) as TFile | null;
+    if (existing) {
+      await this.app.workspace.getLeaf(false).openFile(existing);
+      return;
+    }
+    this.confirmAndRunOperation(createTodayWorklogOperationPreview(path), async () => {
+      const f = await ensureTodayWorklog(this.app);
+      await this.app.workspace.getLeaf(false).openFile(f);
+    }, { refresh: false });
   }
   private openTodoModal() {
     new TodoModal(this.app, async (text) => {
-      await addTodoToWorklog(this.app, text);
-      await this.refreshTodoSection();
+      this.confirmAndRunOperation(createTodoAddOperationPreview(text), async () => {
+        await addTodoToWorklog(this.app, text);
+        new Notice("Todo 已加入今日工作日志");
+      });
     }).open();
   }
 
@@ -1639,6 +1662,17 @@ export class DashboardView extends ItemView {
       } else {
         await this.render();
       }
+    }).open();
+  }
+
+  private confirmAndRunOperation(
+    preview: ControlledWritePreview,
+    operation: () => Promise<void>,
+    options: { refresh?: boolean } = {},
+  ) {
+    new WritePreviewModal(this.app, preview, async () => {
+      await operation();
+      if (options.refresh ?? true) await this.render();
     }).open();
   }
 
@@ -1690,20 +1724,9 @@ export class DashboardView extends ItemView {
   }
   private runCmd(id: string) { try { (this.app as any).commands.executeCommandById(id); } catch {} }
 
-  private async archiveStaleTodosFromOldWorklogs() {
-    if (this.archivingStaleTodos) return;
-    this.archivingStaleTodos = true;
-    try {
-      await archiveStaleTodosToProjectBacklog(this.app);
-    } finally {
-      this.archivingStaleTodos = false;
-    }
-  }
-
   private registerLiveRefresh() {
     const onVaultChange = async (file: TAbstractFile) => {
       if (!this.shouldRefreshForPath(file.path)) return;
-      if (file.path === getTodayWorklogPath()) await this.archiveCompletedTodosFromToday();
       this.scheduleLiveRender();
     };
     this.registerEvent(this.app.vault.on("modify", onVaultChange));
@@ -1727,16 +1750,6 @@ export class DashboardView extends ItemView {
       if (!this.containerEl.isConnected) return;
       await this.render();
     }, 300);
-  }
-
-  private async archiveCompletedTodosFromToday() {
-    if (this.archivingCompletedTodos) return;
-    this.archivingCompletedTodos = true;
-    try {
-      await archiveCompletedTodosInWorklog(this.app);
-    } finally {
-      this.archivingCompletedTodos = false;
-    }
   }
 
   /** 蛇跑完後等 2 秒自動重播，不依賴 60s 全量刷新 */

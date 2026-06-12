@@ -618,7 +618,6 @@ export async function archiveStaleTodosToProjectBacklog(app: App): Promise<boole
 }
 
 export async function loadProjectBacklog(app: App): Promise<ProjectBacklogItem[]> {
-  await syncProjectBacklogFromProjectNotes(app);
   const todayTasks = new Set((await loadTodos(app)).map(todo => cleanTaskText(todo.text)));
   const completedCache = new Map<string, Set<string>>();
   const files = app.vault.getMarkdownFiles()

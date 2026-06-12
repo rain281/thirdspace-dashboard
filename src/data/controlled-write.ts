@@ -27,6 +27,14 @@ export interface FocusYamlPreviewInput {
   warnings?: string[];
 }
 
+export interface OperationPreviewInput {
+  path: string;
+  title: string;
+  summary: string;
+  content: string;
+  warnings?: string[];
+}
+
 const MARKER_PREFIX = "thirdspace-dashboard";
 
 export function createManagedSectionPreview(input: ManagedSectionPreviewInput): ControlledWritePreview {
@@ -54,6 +62,20 @@ export function createFocusYamlPreview(input: FocusYamlPreviewInput): Controlled
     after,
     writeContent: after,
     diff: simpleLineDiff(input.existingContent, after),
+    warnings: input.warnings ?? [],
+  };
+}
+
+export function createOperationPreview(input: OperationPreviewInput): ControlledWritePreview {
+  const writeContent = normalizeTrailingNewline(input.content);
+  return {
+    path: input.path,
+    title: input.title,
+    summary: input.summary,
+    before: "",
+    after: writeContent,
+    writeContent,
+    diff: `+${input.summary}\n${writeContent.split("\n").filter(Boolean).map(line => `+${line}`).join("\n")}`,
     warnings: input.warnings ?? [],
   };
 }

@@ -3,6 +3,7 @@ import {
   applyControlledWritePreview,
   createFocusYamlPreview,
   createManagedSectionPreview,
+  createOperationPreview,
 } from "../src/data/controlled-write";
 
 const weeklyPlan = [
@@ -99,3 +100,17 @@ const yamlPreview = createFocusYamlPreview({
 assert.equal(yamlPreview.summary, "写入结构化 YAML 状态文件");
 assert.match(yamlPreview.after, /confirmation_status: "confirmed"/);
 assert.deepEqual(yamlPreview.warnings, ["Focus 上限为 3；不会修改 archived 项目。"]);
+
+const operationPreview = createOperationPreview({
+  path: "Dashboard controlled operation",
+  title: "纳入项目候选",
+  summary: "确认后才会更新项目索引、项目首页和发现队列。",
+  content: "- 项目：Kora\n- 操作：纳入",
+  warnings: ["这是多文件操作，确认前不会写入 vault。"],
+});
+
+assert.equal(operationPreview.path, "Dashboard controlled operation");
+assert.equal(operationPreview.title, "纳入项目候选");
+assert.match(operationPreview.writeContent, /项目：Kora/);
+assert.match(operationPreview.diff, /确认后才会更新/);
+assert.deepEqual(operationPreview.warnings, ["这是多文件操作，确认前不会写入 vault。"]);
