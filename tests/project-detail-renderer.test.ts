@@ -6,23 +6,25 @@ class FakeElement {
   cls = "";
   text = "";
   children: FakeElement[] = [];
+  attrs: Record<string, string> = {};
   listeners = new Map<string, Array<() => void>>();
 
-  constructor(cls = "", text = "") {
+  constructor(cls = "", text = "", attrs: Record<string, string> = {}) {
     this.cls = cls;
     this.text = text;
+    this.attrs = attrs;
   }
 
-  createDiv(options: { cls?: string; text?: string } = {}): FakeElement {
-    return this.append(new FakeElement(options.cls ?? "", options.text ?? ""));
+  createDiv(options: { cls?: string; text?: string; attr?: Record<string, string> } = {}): FakeElement {
+    return this.append(new FakeElement(options.cls ?? "", options.text ?? "", options.attr));
   }
 
-  createSpan(options: { cls?: string; text?: string } = {}): FakeElement {
-    return this.append(new FakeElement(options.cls ?? "", options.text ?? ""));
+  createSpan(options: { cls?: string; text?: string; attr?: Record<string, string> } = {}): FakeElement {
+    return this.append(new FakeElement(options.cls ?? "", options.text ?? "", options.attr));
   }
 
-  createEl(tag: string, options: { cls?: string; text?: string } = {}): FakeElement {
-    return this.append(new FakeElement(options.cls ?? tag, options.text ?? ""));
+  createEl(tag: string, options: { cls?: string; text?: string; attr?: Record<string, string> } = {}): FakeElement {
+    return this.append(new FakeElement(options.cls ?? tag, options.text ?? "", options.attr));
   }
 
   addEventListener(event: string, listener: () => void): void {
@@ -57,6 +59,10 @@ class FakeElement {
 
   hasClass(cls: string): boolean {
     return this.cls.split(/\s+/).includes(cls);
+  }
+
+  getAttr(name: string): string | undefined {
+    return this.attrs[name];
   }
 
   findByText(pattern: RegExp): FakeElement | null {
@@ -195,6 +201,13 @@ parent
   .find(element => /^状态笔记/.test(element.textContent()))
   ?.click();
 assert.deepEqual(opened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
+assert.match(
+  parent
+    .findAllByClass("ts-detail-link-row")
+    .find(element => /^状态笔记/.test(element.textContent()))
+    ?.getAttr("title") ?? "",
+  /04-项目\/产品系统\/Kora\/Kora项目状态\.md/,
+);
 
 parent
   .findAllByClass("ts-detail-link-row")
@@ -207,6 +220,7 @@ const repoRow = parent
   .find(element => /^仓库/.test(element.textContent()));
 assert.equal(repoRow?.hasClass("is-muted"), true, "repo path is muted when no open handler exists");
 assert.equal(repoRow?.hasClass("is-openable"), false, "repo path is not presented as openable");
+assert.match(repoRow?.getAttr("title") ?? "", /只读路径/);
 
 parent.findByClass("ts-detail-action--next-step")?.click();
 parent.findByClass("ts-detail-action--risk")?.click();
@@ -222,6 +236,7 @@ const missingContextRow = missingLinkParent
   .findAllByClass("ts-detail-link-row")
   .find(element => /^上下文/.test(element.textContent()));
 assert.equal(missingContextRow?.hasClass("is-muted"), true, "missing link is muted");
+assert.match(missingContextRow?.getAttr("title") ?? "", /缺失/);
 
 const emptyParent = new FakeElement();
 renderProjectDetailPage(emptyParent as unknown as HTMLElement, null, {

@@ -140,10 +140,19 @@ function quickLink(
   openable = true,
   handler?: (path: string) => void,
 ): void {
-  const row = parent.createDiv({ cls: `ts-detail-link-row${openable && path ? " is-openable" : " is-muted"}` });
+  const row = parent.createDiv({
+    cls: `ts-detail-link-row${openable && path ? " is-openable" : " is-muted"}`,
+    attr: { title: linkTitle(label, path, openable) },
+  });
   row.createSpan({ cls: "ts-detail-link-label", text: label });
   row.createSpan({ cls: "ts-detail-link-path", text: path || "-" });
   if (openable && path) row.addEventListener("click", () => handler ? handler(path) : actions.openFile(path));
+}
+
+function linkTitle(label: string, path: string, openable: boolean): string {
+  if (!path) return `${label}缺失`;
+  if (!openable) return `${label}只读路径：${path}`;
+  return `${label}：${path}`;
 }
 
 interface SummaryItem {
