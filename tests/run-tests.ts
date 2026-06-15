@@ -14,5 +14,6 @@ import "./project-detail-renderer.test";
 import "./portfolio-styles.test";
 import "./vault-reader.test";
 import "./live-git.test";
+import "./git-activity-summary.test";
 
 console.log("unit tests passed");

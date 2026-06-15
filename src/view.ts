@@ -68,6 +68,7 @@ import { renderTodayExecution } from "./components/today-execution";
 import { renderWeeklyReview } from "./components/weekly-review";
 import { renderWritePreviewModalContent } from "./components/write-preview-modal";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
+import { buildGitActivityCardModel } from "./components/git-activity-summary";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
 type TimelineFilter = "all" | TimelineKind;
@@ -625,6 +626,13 @@ export class DashboardView extends ItemView {
   }
 
   private renderGitActivity(parent: HTMLElement, git: GitActivitySummary) {
+    const model = buildGitActivityCardModel(git);
+    const summary = parent.createDiv({ cls: "ts-git-summary" });
+    this.renderGitMetric(summary, "90d", model.totalLabel, "commits");
+    this.renderGitMetric(summary, "Today", model.todayLabel, "commits");
+    this.renderGitMetric(summary, "Top", model.topRepoLabel, model.topRepoMeta);
+    this.renderGitMetric(summary, "Latest", model.latestRepoLabel, model.latestRepoMeta);
+
     const chart = parent.createDiv({ cls: "ts-git-trend" });
     const max = Math.max(...git.days.map(d => d.count), 1);
     git.days.forEach((day, idx) => {
@@ -635,21 +643,28 @@ export class DashboardView extends ItemView {
     });
 
     const repos = parent.createDiv({ cls: "ts-git-repo-list" });
-    const visible = git.repos.slice(0, 3);
-    const repoMax = Math.max(...visible.map(r => r.count), 1);
-    if (visible.length === 0) {
+    if (model.repoRows.length === 0) {
       repos.createDiv({ cls: "ts-empty", text: "No Git activity" });
       return;
     }
-    visible.forEach((repo, idx) => {
+    model.repoRows.forEach((repo, idx) => {
       const row = repos.createDiv({ cls: "ts-git-repo-row", attr: { style: `--ts-i:${idx}` } });
       row.createSpan({ cls: "ts-git-repo-name", text: repo.name });
-      row.createSpan({ cls: "ts-git-repo-count", text: `${repo.count}` });
+      row.createSpan({ cls: "ts-git-repo-branch", text: repo.branch });
+      row.createSpan({ cls: "ts-git-repo-count", text: repo.countLabel });
       row.createDiv({ cls: "ts-git-repo-bar" }).createDiv({
         cls: "ts-git-repo-fill",
-        attr: { style: `width:${Math.round(repo.count / repoMax * 100)}%;--ts-i:${idx}` },
+        attr: { style: `width:${repo.widthPercent}%;--ts-i:${idx}` },
       });
     });
+  }
+
+  private renderGitMetric(parent: HTMLElement, label: string, value: string, sub: string) {
+    const item = parent.createDiv({ cls: "ts-git-metric" });
+    item.createDiv({ cls: "ts-git-metric-value", text: value });
+    const row = item.createDiv({ cls: "ts-git-metric-row" });
+    row.createSpan({ cls: "ts-git-metric-label", text: label });
+    row.createSpan({ cls: "ts-git-metric-sub", text: sub });
   }
 
   private fillRecentDays(activity: DailyActivity[], days: number): DailyActivity[] {
