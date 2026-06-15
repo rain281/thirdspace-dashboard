@@ -1,4 +1,10 @@
 import type { App, TFile } from "obsidian";
+import {
+  buildLiveGitRepoSources,
+  readLiveGitSnapshot,
+  type LiveGitExecutor,
+  type LiveGitSnapshot,
+} from "./live-git";
 
 // ── Local date helpers（讀系統時區，不硬編碼）────────────────────
 // sv-SE locale 的格式恰好是 YYYY-MM-DD / HH:MM:SS，且跟隨系統時區
@@ -78,6 +84,7 @@ const PROJECT_COMPLETED_NAME = "完成事项.md";
 const FALLBACK_UNFINISHED_PATH = "01-收件箱/待整理/项目未完成事项.md";
 const FALLBACK_COMPLETED_PATH = "01-收件箱/待整理/项目完成事项.md";
 const TASK_ARCHIVE_START_COMPACT = "20260603";
+let liveGitExecutorOverride: LiveGitExecutor | null = null;
 
 interface MarkdownFileRef {
   path: string;
@@ -343,20 +350,97 @@ export async function getGitActivity(app: App, days = 90): Promise<GitActivitySu
   }
 
   const repos: GitRepoActivity[] = [];
-  let total = 0;
+  const live = await addLiveGitActivity(app, countMap, repos, start.getTime(), endMs);
+  let total = live.total;
+  if (!live.hasLiveData) {
+    total = await addCachedGitActivity(app, countMap, repos, start.getTime(), endMs);
+  } else if (live.degradedRepoKeys.size > 0) {
+    total += await addCachedGitActivity(app, countMap, repos, start.getTime(), endMs, live.degradedRepoKeys);
+  }
+
+  return {
+    days: Object.entries(countMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)),
+    repos: repos.sort((a, b) => b.count - a.count || b.lastCommit - a.lastCommit),
+    total,
+  };
+}
+
+export function setLiveGitExecutorForTests(executor: LiveGitExecutor | null): void {
+  liveGitExecutorOverride = executor;
+}
+
+async function addLiveGitActivity(
+  app: App,
+  countMap: Record<string, number>,
+  repos: GitRepoActivity[],
+  startMs: number,
+  endMs: number,
+): Promise<{ total: number; hasLiveData: boolean; degradedRepoKeys: Set<string> }> {
+  try {
+    const snapshot = await loadLiveGitSnapshotForApp(app);
+    let total = 0;
+    for (const repo of snapshot.repos) {
+      let repoCount = 0;
+      let lastCommit = 0;
+      for (const commit of repo.commits) {
+        const counted = countGitCommit(commit.time, countMap, startMs, endMs);
+        lastCommit = Math.max(lastCommit, counted.timestamp);
+        if (!counted.inWindow) continue;
+        repoCount++;
+        total++;
+      }
+      repos.push({
+        id: repo.id,
+        name: repo.name,
+        branch: repo.branch,
+        count: repoCount,
+        lastCommit,
+      });
+    }
+    return {
+      total,
+      hasLiveData: snapshot.repos.length > 0,
+      degradedRepoKeys: new Set(snapshot.degraded.flatMap(repo => repoActivityKeys(repo.id, repo.path))),
+    };
+  } catch {
+    return { total: 0, hasLiveData: false, degradedRepoKeys: new Set<string>() };
+  }
+}
+
+async function loadLiveGitSnapshotForApp(app: App): Promise<LiveGitSnapshot> {
+  const vaultRoot = vaultRootPath(app);
+  const projects = await loadProjectIndex(app);
+  const sources = buildLiveGitRepoSources(vaultRoot, projects);
+  if (sources.length === 0) return { repos: [], degraded: [] };
+  return readLiveGitSnapshot(sources, {
+    executor: liveGitExecutorOverride ?? undefined,
+  });
+}
+
+function vaultRootPath(app: App): string {
+  return (app.vault.adapter as unknown as { basePath?: string }).basePath ?? "";
+}
+
+async function addCachedGitActivity(
+  app: App,
+  countMap: Record<string, number>,
+  repos: GitRepoActivity[],
+  startMs: number,
+  endMs: number,
+  allowedRepoKeys?: Set<string>,
+): Promise<number> {
   try {
     const raw = await app.vault.adapter.read(".thirdspace/git/commits.json");
-    const data = JSON.parse(raw) as { repos?: Array<{ id?: string; name?: string; branch?: string; commits?: Array<{ time?: string }> }> };
+    const data = JSON.parse(raw) as GitIndexFile;
+    let total = 0;
     for (const repo of data.repos ?? []) {
+      if (allowedRepoKeys && !repoActivityKeys(repo.id, repo.path).some(key => allowedRepoKeys.has(key))) continue;
       let repoCount = 0;
       let lastCommit = 0;
       for (const commit of repo.commits ?? []) {
-        const ts = commit.time ? new Date(commit.time).getTime() : 0;
-        if (!ts) continue;
-        lastCommit = Math.max(lastCommit, ts);
-        if (ts < start.getTime() || ts > endMs) continue;
-        const date = localDateStr(new Date(ts));
-        countMap[date] = (countMap[date] ?? 0) + 1;
+        const counted = countGitCommit(commit.time, countMap, startMs, endMs);
+        lastCommit = Math.max(lastCommit, counted.timestamp);
+        if (!counted.inWindow) continue;
         repoCount++;
         total++;
       }
@@ -368,13 +452,31 @@ export async function getGitActivity(app: App, days = 90): Promise<GitActivitySu
         lastCommit,
       });
     }
-  } catch {}
+    return total;
+  } catch {
+    return 0;
+  }
+}
 
-  return {
-    days: Object.entries(countMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)),
-    repos: repos.sort((a, b) => b.count - a.count || b.lastCommit - a.lastCommit),
-    total,
-  };
+function repoActivityKeys(id: string | undefined, repoPath: string | undefined): string[] {
+  return [
+    id ? `id:${id}` : "",
+    repoPath ? `path:${repoPath.replace(/\/+$/, "")}` : "",
+  ].filter(Boolean);
+}
+
+function countGitCommit(
+  time: string | undefined,
+  countMap: Record<string, number>,
+  startMs: number,
+  endMs: number,
+): { timestamp: number; inWindow: boolean } {
+  const timestamp = time ? new Date(time).getTime() : 0;
+  if (!timestamp) return { timestamp: 0, inWindow: false };
+  if (timestamp < startMs || timestamp > endMs) return { timestamp, inWindow: false };
+  const date = localDateStr(new Date(timestamp));
+  countMap[date] = (countMap[date] ?? 0) + 1;
+  return { timestamp, inWindow: true };
 }
 
 function startOfLocalDay(date: Date): Date {
