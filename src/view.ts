@@ -70,6 +70,7 @@ import { renderWeeklyReview } from "./components/weekly-review";
 import { renderWritePreviewModalContent } from "./components/write-preview-modal";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
 import { buildGitActivityCardModel } from "./components/git-activity-summary";
+import { canCommitRenderPass, RenderPassGuard } from "./data/render-pass";
 
 export const VIEW_TYPE = "thirdspace-dashboard";
 type TimelineFilter = "all" | TimelineKind;
@@ -226,6 +227,7 @@ export class DashboardView extends ItemView {
   private projectsViewMode: "portfolio" | "detail" = "portfolio";
   private snakeRouteCache: SnakeRouteCache | null = null;
   private snakeReplayTimer: number | null = null;
+  private readonly renderPassGuard = new RenderPassGuard();
   private readonly singleScreenLimit = {
     todos: 5,
     highlights: 3,
@@ -258,6 +260,7 @@ export class DashboardView extends ItemView {
   }
 
   async render() {
+    const renderPass = this.renderPassGuard.begin();
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("ts-dash");
@@ -285,6 +288,14 @@ export class DashboardView extends ItemView {
     ]);
     const products  = productMd ? parseProducts(productMd) : [];
     const pending   = todos.filter(t => !t.done);
+    const portfolio = await loadPortfolioModel(this.app);
+    const weeklyPlanContent = this.activePage === "system"
+      ? await this.app.vault.adapter.read(focusWeeklyPlanPath(portfolio.focusWeek.week)).catch(() => "")
+      : "";
+
+    if (!canCommitRenderPass(this.renderPassGuard, renderPass, this.containerEl)) return;
+    contentEl.empty();
+    contentEl.addClass("ts-dash");
 
     // ── macOS dashboard shell
     const hdr = contentEl.createDiv({ cls: "ts-hdr" });
@@ -309,7 +320,6 @@ export class DashboardView extends ItemView {
     refreshBtn.addEventListener("click", () => { this.snakeRouteCache = null; this.render(); });
 
     const board = contentEl.createDiv({ cls: `ts-board ts-board--${this.activePage}` });
-    const portfolio = await loadPortfolioModel(this.app);
     if (this.activePage === "today") {
       this.renderTodayPage(board, todos, projectBacklog, todayWorklog, portfolio);
     } else if (this.activePage === "projects") {
@@ -317,7 +327,6 @@ export class DashboardView extends ItemView {
     } else if (this.activePage === "review") {
       this.renderReviewPage(board, portfolio, weeklyWorklogs);
     } else {
-      const weeklyPlanContent = await this.app.vault.adapter.read(focusWeeklyPlanPath(portfolio.focusWeek.week)).catch(() => "");
       this.renderSystemPage(board, activity, projectActivity, gitActivity, wsStats, recent, products, discovery, onboarding, materials, portfolio, weeklyPlanContent);
     }
     this.renderPageSwitch(contentEl);
