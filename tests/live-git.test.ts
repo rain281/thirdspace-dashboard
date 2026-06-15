@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   buildLiveGitRepoSources,
   parseGitLogOutput,
+  readLiveGitSnapshot,
+  type LiveGitExecutor,
 } from "../src/data/live-git";
 
 const repoSources = buildLiveGitRepoSources("/Volumes/资料/projects/thirdspace/rain", [
@@ -70,3 +72,58 @@ assert.deepEqual(parsedCommits[0], {
   repo: repoSources[0],
 });
 assert.deepEqual(parsedCommits[1].files, ["src/main.ts"]);
+
+const calls: Array<{ command: string; args: string[]; timeout: number }> = [];
+const executor: LiveGitExecutor = async (command, args, options) => {
+  calls.push({ command, args, timeout: options.timeout });
+  const repoPath = args[1];
+  if (repoPath === "/Volumes/资料/projects/pilot") throw new Error("not a git repo");
+  if (args.includes("rev-parse")) return { stdout: "main\n" };
+  return {
+    stdout: [
+      "\x1ecccccccccccccccccccccccccccccccccccccccc\x1fccccccc\x1f2026-06-15T12:00:00+08:00\x1fRain User\x1ffeat: live reader",
+      "src/data/live-git.ts",
+    ].join("\n"),
+  };
+};
+
+const liveSnapshot = await readLiveGitSnapshot([
+  repoSources[0],
+  repoSources[2],
+], { executor, maxCount: 200, timeoutMs: 2000 });
+
+assert.deepEqual(calls, [
+  {
+    command: "git",
+    args: ["-C", "/Volumes/资料/projects/thirdspace/rain", "rev-parse", "--abbrev-ref", "HEAD"],
+    timeout: 2000,
+  },
+  {
+    command: "git",
+    args: [
+      "-C",
+      "/Volumes/资料/projects/thirdspace/rain",
+      "log",
+      "--max-count=200",
+      "--date=iso-strict",
+      "--name-only",
+      "--pretty=format:%x1e%H%x1f%h%x1f%cI%x1f%an%x1f%s",
+    ],
+    timeout: 2000,
+  },
+  {
+    command: "git",
+    args: ["-C", "/Volumes/资料/projects/pilot", "rev-parse", "--abbrev-ref", "HEAD"],
+    timeout: 2000,
+  },
+]);
+assert.deepEqual(liveSnapshot.repos.map(repo => repo.id), ["rain"]);
+assert.equal(liveSnapshot.repos[0].commits[0].subject, "feat: live reader");
+assert.deepEqual(liveSnapshot.degraded, [
+  {
+    id: "pilot",
+    name: "Pilot",
+    path: "/Volumes/资料/projects/pilot",
+    reason: "not a git repo",
+  },
+]);

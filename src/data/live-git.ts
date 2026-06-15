@@ -1,5 +1,13 @@
 import * as nodePath from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import type { ProjectIndexEntry } from "./vault-reader";
+
+const execFileAsync = promisify(execFile);
+const DEFAULT_MAX_COUNT = 200;
+const DEFAULT_TIMEOUT_MS = 2000;
+const DEFAULT_MAX_BUFFER = 5 * 1024 * 1024;
+const GIT_LOG_FORMAT = "--pretty=format:%x1e%H%x1f%h%x1f%cI%x1f%an%x1f%s";
 
 export interface LiveGitRepoSource {
   id: string;
@@ -36,6 +44,18 @@ export interface LiveGitDegradedRepo {
 export interface LiveGitSnapshot {
   repos: LiveGitRepoSnapshot[];
   degraded: LiveGitDegradedRepo[];
+}
+
+export type LiveGitExecutor = (
+  command: string,
+  args: string[],
+  options: { encoding: "utf8"; timeout: number; maxBuffer: number },
+) => Promise<{ stdout: string }>;
+
+export interface ReadLiveGitSnapshotOptions {
+  executor?: LiveGitExecutor;
+  maxCount?: number;
+  timeoutMs?: number;
 }
 
 export function buildLiveGitRepoSources(vaultRoot: string, projects: ProjectIndexEntry[]): LiveGitRepoSource[] {
@@ -84,6 +104,63 @@ export function parseGitLogOutput(output: string, repo: LiveGitRepoSource, branc
     });
   }
   return commits;
+}
+
+export async function readLiveGitSnapshot(
+  sources: LiveGitRepoSource[],
+  options: ReadLiveGitSnapshotOptions = {},
+): Promise<LiveGitSnapshot> {
+  const executor = options.executor ?? defaultGitExecutor;
+  const timeout = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxCount = options.maxCount ?? DEFAULT_MAX_COUNT;
+  const repos: LiveGitRepoSnapshot[] = [];
+  const degraded: LiveGitDegradedRepo[] = [];
+
+  for (const source of sources) {
+    try {
+      const execOptions = { encoding: "utf8" as const, timeout, maxBuffer: DEFAULT_MAX_BUFFER };
+      const branchResult = await executor("git", ["-C", source.path, "rev-parse", "--abbrev-ref", "HEAD"], execOptions);
+      const branch = branchResult.stdout.trim();
+      const logResult = await executor("git", [
+        "-C",
+        source.path,
+        "log",
+        `--max-count=${maxCount}`,
+        "--date=iso-strict",
+        "--name-only",
+        GIT_LOG_FORMAT,
+      ], execOptions);
+      repos.push({
+        id: source.id,
+        name: source.name,
+        path: source.path,
+        branch,
+        commits: parseGitLogOutput(logResult.stdout, source, branch),
+      });
+    } catch (error) {
+      degraded.push({
+        id: source.id,
+        name: source.name,
+        path: source.path,
+        reason: errorMessage(error),
+      });
+    }
+  }
+
+  return { repos, degraded };
+}
+
+async function defaultGitExecutor(
+  command: string,
+  args: string[],
+  options: { encoding: "utf8"; timeout: number; maxBuffer: number },
+): Promise<{ stdout: string }> {
+  const result = await execFileAsync(command, args, options);
+  return { stdout: result.stdout };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function normalizeRepoPath(repoPath: string): string {
