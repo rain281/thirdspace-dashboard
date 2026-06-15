@@ -495,23 +495,67 @@
   flex-direction: column;
 }
 
+.ts-review-summary-top {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ts-review-summary-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ts-review-summary-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-2);
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ts-review-summary-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-family: var(--ts-mono);
+  font-size: 10px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ts-review-metrics {
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 5px;
 }
 
 .ts-review-write-btn {
-  width: 100%;
-  min-height: 30px;
-  margin: 10px 0 0;
+  appearance: none;
+  width: auto;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 9px;
   border: 1px solid var(--ts-accent-2);
   border-radius: var(--ts-radius-sm);
   background: color-mix(in srgb, var(--ts-accent-2) 16%, transparent 84%);
   color: var(--ts-text);
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--ts-font);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -521,7 +565,7 @@
 
 .ts-review-metric {
   min-width: 0;
-  padding: 7px 8px;
+  padding: 6px 7px;
   border: 1px solid var(--ts-border);
   border-radius: var(--ts-radius-sm);
   background: color-mix(in srgb, var(--background-primary) 83%, var(--ts-panel) 17%);

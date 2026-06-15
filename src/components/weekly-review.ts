@@ -21,11 +21,12 @@ export function renderWeeklyReview(parent: HTMLElement, model: WeeklyReviewModel
 
 function renderSummary(parent: HTMLElement, model: WeeklyReviewModel, actions: WeeklyReviewActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-review-summary-card" });
-  const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "周复盘" });
-  head.createSpan({ cls: "ts-card-meta", text: `${model.week} · ${model.worklogCount} 篇日志` });
+  const top = card.createDiv({ cls: "ts-review-summary-top" });
+  const copy = top.createDiv({ cls: "ts-review-summary-copy" });
+  copy.createDiv({ cls: "ts-review-summary-title", text: "周复盘" });
+  copy.createDiv({ cls: "ts-review-summary-meta", text: `${model.week} · ${model.worklogCount} 篇日志` });
   if (actions.onWriteWeeklyReview) {
-    const btn = card.createEl("button", { cls: "ts-review-write-btn", text: "写入周复盘" });
+    const btn = top.createEl("button", { cls: "ts-review-write-btn", text: "写入周复盘" });
     btn.addEventListener("click", event => {
       event.stopPropagation();
       actions.onWriteWeeklyReview?.();

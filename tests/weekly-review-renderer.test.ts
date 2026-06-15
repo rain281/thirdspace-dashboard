@@ -147,8 +147,13 @@ assert.match(text, /Mail\.app 权限/);
 assert.match(text, /下周建议/);
 assert.match(text, /继续主项目 Kora/);
 assert.equal(parent.findAllByClass("ts-review-section").length, 5);
+assert.equal(parent.findAllByClass("ts-review-summary-top").length, 1);
+assert.equal(parent.findAllByClass("ts-review-summary-copy").length, 1);
+assert.equal(parent.findAllByClass("ts-review-summary-title").length, 1);
+assert.equal(parent.findAllByClass("ts-review-summary-meta").length, 1);
 assert.equal(parent.findAllByClass("ts-review-focus-grid").length, 1);
 assert.equal(parent.findAllByClass("ts-review-focus-cardlet").length, 3);
+assert.equal(parent.findAllByClass("ts-review-metric").length, 5);
 
 parent.findByClass("ts-review-write-btn")?.click();
 assert.equal(writeClicks, 1);
