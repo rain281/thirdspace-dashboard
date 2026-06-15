@@ -49,8 +49,8 @@ function renderWeeklyFocus(parent: HTMLElement, model: PortfolioModel, actions: 
     return;
   }
 
-  const list = card.createDiv({ cls: "ts-focus-list" });
-  for (const project of focusProjects) renderProjectCard(list, project, actions, true);
+  const list = card.createDiv({ cls: "ts-focus-card-grid" });
+  for (const project of focusProjects.slice(0, 3)) renderFocusCardlet(list, project, actions);
 }
 
 function renderFocusSuggestions(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
@@ -131,6 +131,27 @@ function renderProjectCard(parent: HTMLElement, project: ManagedProject, actions
   renderProjectQueue(row, "gate", project.deliveryGates);
 }
 
+function renderFocusCardlet(parent: HTMLElement, project: ManagedProject, actions: PortfolioActions): void {
+  const row = parent.createDiv({
+    cls: `ts-focus-cardlet ts-health--${healthClass(project.health.status)}${actions.selectedProjectId === project.id ? " is-selected" : ""}`,
+  });
+  bindOpen(row, project, actions);
+
+  const top = row.createDiv({ cls: "ts-focus-cardlet-top" });
+  top.createSpan({ cls: "ts-focus-role", text: focusRoleLabel(project.focusRole) });
+  top.createSpan({ cls: "ts-focus-health", text: project.health.status });
+
+  row.createDiv({ cls: "ts-focus-name", text: project.name });
+  row.createDiv({ cls: "ts-focus-meta", text: [project.priority, project.stage, project.lifecycle].filter(Boolean).join(" · ") });
+  row.createDiv({ cls: "ts-focus-milestone", text: project.milestone || "缺当前里程碑" });
+  row.createDiv({ cls: "ts-focus-next", text: compact(project.nextStep) || "缺下一步" });
+
+  const badges = row.createDiv({ cls: "ts-focus-badges" });
+  focusBadge(badges, "风险", countMarkdownItems(project.risks));
+  focusBadge(badges, "决策", countMarkdownItems(project.pendingDecisions));
+  focusBadge(badges, "门禁", countMarkdownItems(project.deliveryGates));
+}
+
 function renderProjectQueue(parent: HTMLElement, label: string, markdown: string): void {
   const text = compact(markdown);
   if (!text) return;
@@ -150,6 +171,13 @@ function metric(parent: HTMLElement, value: string, label: string): void {
   item.createDiv({ cls: "ts-portfolio-metric-label", text: label });
 }
 
+function focusBadge(parent: HTMLElement, label: string, count: number): void {
+  parent.createSpan({
+    cls: `ts-focus-badge${count > 0 ? " has-items" : ""}`,
+    text: `${label} ${count}`,
+  });
+}
+
 function bindOpen(element: HTMLElement, project: ManagedProject, actions: PortfolioActions): void {
   element.addEventListener("click", () => {
     if (actions.openProjectDetail) {
@@ -165,11 +193,26 @@ function bindOpen(element: HTMLElement, project: ManagedProject, actions: Portfo
   });
 }
 
+function focusRoleLabel(role: string | null): string {
+  if (role === "main") return "主项目";
+  if (role === "support") return "副项目";
+  if (role === "maintenance") return "维护";
+  return "焦点";
+}
+
 function compact(markdown: string): string {
   return markdown
     .split("\n")
     .map(line => line.replace(/^\s*[-*]\s+\[[ xX]\]\s+/, "").replace(/^\s*[-*]\s+/, "").trim())
     .filter(Boolean)[0] ?? "";
+}
+
+function countMarkdownItems(markdown: string): number {
+  const lines = markdown
+    .split("\n")
+    .map(line => line.replace(/^\s*[-*]\s+\[[ xX]\]\s+/, "").replace(/^\s*[-*]\s+/, "").trim())
+    .filter(Boolean);
+  return lines.length;
 }
 
 function healthClass(status: ProjectHealthStatus): string {

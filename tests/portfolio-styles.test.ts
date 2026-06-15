@@ -17,6 +17,9 @@ assert.match(reviewBlock, /summary[\s\S]*focus[\s\S]*outcomes[\s\S]*offfocus[\s\
 assertGridAreaIsRectangle(reviewBlock, "risks");
 assertGridAreaIsRectangle(reviewBlock, "next");
 assert.match(styles, /\.ts-portfolio\s*\{[\s\S]*grid-template-areas:[\s\S]*health[\s\S]*focus[\s\S]*risk/);
+assert.match(styles, /\.ts-focus-card-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+assert.match(styles, /\.ts-focus-cardlet\s*\{/);
+assert.doesNotMatch(cssBlock(".ts-focus-card-grid"), /overflow-y:\s*auto/);
 assert.match(styles, /\.ts-maintenance-grid\s*\{[\s\S]*display:\s*grid;/);
 assert.match(styles, /\.ts-review-summary-col\s*\{\s*grid-area:\s*summary;/);
 assert.match(styles, /\.ts-review-focus-col\s*\{\s*grid-area:\s*focus;/);

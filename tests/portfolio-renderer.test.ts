@@ -153,11 +153,32 @@ assert.match(text, /npm run build/);
 assert.doesNotMatch(text, /SYSTEM SIGNALS/);
 assert.doesNotMatch(text, /PROJECT DETAIL/);
 
+const weeklyFocusCard = parent.findByClass("ts-weekly-focus-card");
+assert.ok(weeklyFocusCard, "weekly focus card exists");
+assert.equal(parent.findAllByClass("ts-focus-card-grid").length, 1);
+assert.equal(parent.findAllByClass("ts-focus-cardlet").length, 1);
+assert.equal(parent.findAllByClass("ts-project-card--focus").length, 0);
+const weeklyFocusText = weeklyFocusCard.textContent();
+assert.match(weeklyFocusText, /主项目/);
+assert.match(weeklyFocusText, /Kora/);
+assert.match(weeklyFocusText, /风险/);
+assert.match(weeklyFocusText, /决策/);
+assert.match(weeklyFocusText, /门禁/);
+assert.doesNotMatch(weeklyFocusText, /发布门禁未关闭/);
+assert.doesNotMatch(weeklyFocusText, /确认首屏密度/);
+assert.doesNotMatch(weeklyFocusText, /npm run build/);
+
 parent.findByClass("ts-focus-confirm-btn")?.click();
 assert.equal(confirmedFocus, 1);
 
-parent.findByClass("ts-project-card")?.click();
+parent.findByClass("ts-focus-cardlet")?.click();
 assert.deepEqual(opened, ["04-项目/产品系统/Kora/Kora项目状态.md"]);
+
+parent.findByClass("ts-project-card")?.click();
+assert.deepEqual(opened, [
+  "04-项目/产品系统/Kora/Kora项目状态.md",
+  "04-项目/产品系统/Kora/Kora项目状态.md",
+]);
 
 const fallbackOpened: string[] = [];
 const fallbackParent = new FakeElement();
