@@ -572,7 +572,7 @@ export class DashboardView extends ItemView {
     this.renderNinetyDayCalendar(vaultPanel, recent90);
 
     const projectPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--projects" });
-    projectPanel.createDiv({ cls: "ts-activity-panel-title", text: "项目活跃 · 本周 Top 3" });
+    projectPanel.createDiv({ cls: "ts-activity-panel-title", text: "项目活跃 · 本周前三" });
     this.renderProjectActivity(projectPanel, projects);
 
     const gitPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--git" });
