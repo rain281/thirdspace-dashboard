@@ -15,7 +15,7 @@ export const createStack = (
 ) => {
   const svgElements: string[] = [];
   const styles = [
-    `.u{ 
+    `.u{
       transform-origin: 0 0;
       transform: scale(0,1);
       animation: none linear ${duration}ms infinite;

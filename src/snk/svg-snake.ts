@@ -53,7 +53,7 @@ export const createSnake = (
     `transform:translate(${x * sizeCell}px,${y * sizeCell}px)`;
 
   const styles = [
-    `.s{ 
+    `.s{
       shape-rendering: geometricPrecision;
       fill: var(--cs);
       animation: none linear ${duration}ms 1 forwards

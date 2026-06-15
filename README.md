@@ -59,6 +59,7 @@
 | **WORKSPACES**（文件数/活跃时间） | `.thirdspace/workspace-index.yaml` + 各工作区目录下所有 `.md` | `frontmatter.modified`（fallback: `stat.mtime`） | yaml 缺失时降级为 8 个默认目录 |
 | **TODAY 工作日志** | `02-日记/工作日志/YYYYMMDD_工作日志_周X.md` | `## 今日重点`、`## 重点记录` | 文件不存在则面板隐藏 |
 | **TODAY'S TODOS** | 同上，今日工作日志 | `## 今日Todo`，格式 `- [ ] xxx` / `- [x] xxx ✅ YYYY-MM-DD` | 无 todo 文件则空列表 |
+| **Git 提交 / Today Git 时间线** | 实时 `git log`：Rain vault 根目录 + `.thirdspace/project-index.yaml` 中非 archived 项目的 `repo_path`；fallback：`.thirdspace/events/YYYYMMDD.ndjson`、`.thirdspace/git/commits.json`、今日工作日志 `## Git 提交` | commit hash、时间、作者名、subject、branch、文件名 | 单个 repo 读取失败只降级该 repo；全部 live 失败时使用缓存/工作日志 |
 | **PROJECTS / PORTFOLIO** | `.thirdspace/project-index.yaml` + 每个项目的 `status_note` + 可选 `.thirdspace/focus-week.yaml` | 项目索引字段、标准项目状态 section、本周 Focus | 索引或状态缺失时降级为空 Portfolio / 注意状态 |
 | **SYSTEM / INBOX** | `.thirdspace/project-index.yaml`、项目接入/资料索引、旧 `04-项目/product-status.md` | 项目发现、onboarding、materials、旧产品状态 | 缺失时只隐藏对应维护信号 |
 | **RECENT** | 全库所有 `.md` | `frontmatter.modified`（fallback: `stat.mtime`） | 降级到文件系统时间 |
@@ -141,6 +142,24 @@ off_focus_events: []
 ```
 
 `04-项目/product-status.md` 仍作为 SYSTEM / INBOX 维护信号读取，不再是项目系统主数据源。
+
+### Git 实时数据源
+
+Git 活动面板和 Today 时间线中的 Git 行优先读取实时 `git log`。仓库白名单只来自两个入口：
+
+1. 当前 Rain vault 根目录。
+2. `.thirdspace/project-index.yaml` 中 `lifecycle !== "archived"` 且带 `repo_path` 的项目。
+
+插件使用固定 `git` 参数读取 branch 和最近提交元数据，不执行 shell、不读取 diff 正文、不扫描 `/Volumes/资料/projects` 全目录，也不读取 `.env`、token、私钥、cookie 或 keychain。读取字段仅限 hash、短 hash、ISO 时间、作者名、subject、branch 和文件名。
+
+fallback 顺序：
+
+1. 实时 `git log`。
+2. `.thirdspace/events/YYYYMMDD.ndjson`。
+3. `.thirdspace/git/commits.json`。
+4. 今日工作日志 `## Git 提交`。
+
+如果某个白名单 repo 超时、缺失或不是 Git 仓库，Dashboard 只给该 repo 降级到 cache；其他 repo 的实时数据继续显示。
 
 ### 统计排除规则
 
