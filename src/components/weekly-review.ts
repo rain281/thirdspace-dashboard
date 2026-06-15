@@ -45,9 +45,9 @@ function renderFocus(parent: HTMLElement, items: WeeklyReviewFocusItem[]): void 
     card.createDiv({ cls: "ts-empty", text: "暂无已确认的本周焦点" });
     return;
   }
-  const list = card.createDiv({ cls: "ts-review-list" });
+  const list = card.createDiv({ cls: "ts-review-focus-grid" });
   for (const item of items) {
-    const row = list.createDiv({ cls: `ts-review-row ts-review-row--focus ${item.hasProgress ? "is-moving" : "is-stalled"}` });
+    const row = list.createDiv({ cls: `ts-review-focus-cardlet ts-review-row--focus ${item.hasProgress ? "is-moving" : "is-stalled"}` });
     row.createSpan({ cls: "ts-review-badge", text: item.roleLabel });
     const info = row.createDiv({ cls: "ts-review-info" });
     info.createDiv({ cls: "ts-review-title", text: item.name });

@@ -21,6 +21,8 @@ assert.match(styles, /\.ts-maintenance-grid\s*\{[\s\S]*display:\s*grid;/);
 assert.match(styles, /\.ts-review-summary-col\s*\{\s*grid-area:\s*summary;/);
 assert.match(styles, /\.ts-review-focus-col\s*\{\s*grid-area:\s*focus;/);
 assert.match(styles, /\.ts-review-next-col\s*\{\s*grid-area:\s*next;/);
+assert.match(styles, /\.ts-review-focus-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+assert.match(styles, /\.ts-review-focus-cardlet\s*\{/);
 assert.match(styles, /\.ts-board--projects-detail/);
 assert.match(styles, /\.ts-project-detail-page/);
 assert.match(styles, /\.ts-detail-back-btn/);

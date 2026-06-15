@@ -565,6 +565,26 @@
   gap: 5px;
 }
 
+.ts-review-focus-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  overflow: hidden;
+}
+
+.ts-review-focus-cardlet {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-primary) 86%, var(--ts-panel) 14%);
+}
+
 .ts-review-row {
   min-width: 0;
   display: grid;
@@ -4414,6 +4434,10 @@ body.theme-dark .ts-dash {
   .ts-review-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .ts-review-focus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @container (max-width: 520px) {
@@ -4496,6 +4520,7 @@ body.theme-dark .ts-dash {
   .ts-portfolio-metrics,
   .ts-system-health-grid,
   .ts-review-metrics,
+  .ts-review-focus-grid,
   .ts-maintenance-grid {
     grid-template-columns: 1fr;
   }
