@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import {
   buildLiveGitRepoSources,
   readLiveGitSnapshot,
+  type LiveGitCommit,
   type LiveGitExecutor,
   type LiveGitSnapshot,
 } from "./live-git";
@@ -1289,11 +1290,28 @@ async function loadStructuredTimelineItems(
   todayCompact: string,
   todayDate: string,
 ): Promise<TimelineItem[]> {
-  const [eventItems, gitIndexItems] = await Promise.all([
+  const [liveGitItems, eventItems, gitIndexItems] = await Promise.all([
+    loadLiveGitTimelineItems(app, sourcePath, todayDate),
     loadStructuredEventFile(app, sourcePath, todayCompact, todayDate),
     loadGitIndexTimelineItems(app, sourcePath, todayDate),
   ]);
-  return [...eventItems, ...gitIndexItems];
+  return [...liveGitItems, ...eventItems, ...gitIndexItems];
+}
+
+async function loadLiveGitTimelineItems(app: App, sourcePath: string, todayDate: string): Promise<TimelineItem[]> {
+  try {
+    const snapshot = await loadLiveGitSnapshotForApp(app);
+    const items: TimelineItem[] = [];
+    for (const repo of snapshot.repos) {
+      for (const commit of repo.commits) {
+        const item = gitEventToTimelineItem(liveCommitToStructuredGitEvent(commit), sourcePath, todayDate);
+        if (item) items.push(item);
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
 }
 
 async function loadStructuredEventFile(
@@ -1355,6 +1373,20 @@ interface StructuredGitEvent {
   commit_short?: string;
   subject?: string;
   files?: string[];
+}
+
+function liveCommitToStructuredGitEvent(commit: LiveGitCommit): StructuredGitEvent {
+  return {
+    type: "git_commit",
+    timestamp: commit.time,
+    repo: commit.repo.path,
+    repo_name: commit.repo.name,
+    branch: commit.branch,
+    commit: commit.hash,
+    commit_short: commit.short_hash,
+    subject: commit.subject,
+    files: commit.files,
+  };
 }
 
 interface GitIndexFile {

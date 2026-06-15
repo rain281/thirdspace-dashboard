@@ -3,6 +3,7 @@ import {
   filterManagedProjectIndexEntries,
   getGitActivity,
   loadProjectBacklog,
+  loadTodayWorklog,
   loadWeeklyWorklogs,
   setLiveGitExecutorForTests,
 } from "../src/data/vault-reader";
@@ -297,3 +298,76 @@ setLiveGitExecutorForTests(null);
 assert.equal(fallbackActivity.total, 2);
 assert.deepEqual(fallbackActivity.repos.map(repo => repo.id), ["kora", "cache-only"]);
 assert.equal(fallbackActivity.days.find(day => day.date === "2026-06-15")?.count, 2);
+
+const todayWorklogPath = "02-日记/工作日志/20260615_工作日志_周一.md";
+const liveTimelineFiles = new Map<string, string>([
+  [todayWorklogPath, [
+    "# 20260615 工作日志 周一",
+    "",
+    "## 今日重点",
+    "",
+    "## 今日Todo",
+    "",
+    "## 重点记录",
+    "",
+    "## 今日产出",
+    "",
+    "## Agent 产出",
+    "",
+    "## Git 提交",
+    "",
+  ].join("\n")],
+  [".thirdspace/project-index.yaml", [
+    'version: "1.0"',
+    "projects:",
+    '  - id: "kora"',
+    '    name: "Kora"',
+    '    workspace: "04-项目/产品系统/Kora"',
+    '    lifecycle: "active"',
+    '    repo_path: "/Volumes/资料/projects/Kora"',
+    "",
+  ].join("\n")],
+]);
+
+const liveTimelineApp = {
+  vault: {
+    adapter: {
+      basePath: "/Volumes/资料/projects/thirdspace/rain",
+      async exists(path: string) {
+        return liveTimelineFiles.has(path);
+      },
+      async list(dir: string) {
+        return {
+          files: Array.from(liveTimelineFiles.keys()).filter(path => path.startsWith(`${dir}/`)),
+          folders: [],
+        };
+      },
+      async read(path: string) {
+        if (liveTimelineFiles.has(path)) return liveTimelineFiles.get(path) as string;
+        throw new Error(`missing ${path}`);
+      },
+    },
+  },
+};
+
+const liveTimelineExecutor: LiveGitExecutor = async (_command, args) => {
+  const repoPath = args[1];
+  if (args.includes("rev-parse")) return { stdout: repoPath === "/Volumes/资料/projects/Kora" ? "main\n" : "main\n" };
+  if (repoPath === "/Volumes/资料/projects/thirdspace/rain") return {
+    stdout: [
+      "\x1e1212121212121212121212121212121212121212\x1f1212121\x1f2026-06-15T13:30:00+08:00\x1fRain User\x1fdocs: live timeline",
+      "04-项目/产品系统/ThirdSpace Dashboard/项目管理系统改造/live.md",
+    ].join("\n"),
+  };
+  return { stdout: "" };
+};
+
+setLiveGitExecutorForTests(liveTimelineExecutor);
+const liveTodayWorklog = await loadTodayWorklog(liveTimelineApp as any);
+setLiveGitExecutorForTests(null);
+
+const liveTimelineGitItems = liveTodayWorklog?.timeline.filter(item => item.kind === "git") ?? [];
+assert.equal(liveTimelineGitItems.length, 1);
+assert.equal(liveTimelineGitItems[0].title, "rain: docs: live timeline");
+assert.equal(liveTimelineGitItems[0].targetPath, "04-项目/产品系统/ThirdSpace Dashboard/项目管理系统改造/live.md");
+assert.equal(liveTimelineGitItems[0].subtitle, "rain · main · 1212121 · 1 files");
