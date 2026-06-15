@@ -269,7 +269,7 @@ export class DashboardView extends ItemView {
       loadWorkspaceIndex(this.app),
       loadProductStatus(this.app),
       getDailyActivity(this.app, 365),
-      getProjectActivity(this.app, 90),
+      getProjectActivity(this.app, { period: "week", limit: 3 }),
       getGitActivity(this.app, 90),
       loadTodos(this.app),
       loadProjectBacklog(this.app),
@@ -564,7 +564,7 @@ export class DashboardView extends ItemView {
 
     const headMeta = head.createDiv({ cls: "ts-activity-head-metrics" });
     this.renderActivityMetric(headMeta, "今日", todayCount, "文件");
-    this.renderActivityMetric(headMeta, "最多", topProject?.name ?? "—", topProject ? `${topProject.recentCount} 文件` : "无项目");
+    this.renderActivityMetric(headMeta, "本周最多", topProject?.name ?? "—", topProject ? `${topProject.recentCount} 文件` : "无项目");
 
     const body = parent.createDiv({ cls: "ts-activity-body" });
     const vaultPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--vault" });
@@ -572,7 +572,7 @@ export class DashboardView extends ItemView {
     this.renderNinetyDayCalendar(vaultPanel, recent90);
 
     const projectPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--projects" });
-    projectPanel.createDiv({ cls: "ts-activity-panel-title", text: `项目活跃 · ${projects.length}` });
+    projectPanel.createDiv({ cls: "ts-activity-panel-title", text: "项目活跃 · 本周 Top 3" });
     this.renderProjectActivity(projectPanel, projects);
 
     const gitPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--git" });
@@ -619,7 +619,7 @@ export class DashboardView extends ItemView {
     const visible = projects;
     const max = Math.max(...visible.map(p => p.recentCount), 1);
     if (visible.length === 0) {
-      list.createDiv({ cls: "ts-empty", text: "暂无项目活动" });
+      list.createDiv({ cls: "ts-empty", text: "本周暂无项目更新" });
       return;
     }
     visible.forEach((project, idx) => {
@@ -629,7 +629,7 @@ export class DashboardView extends ItemView {
       });
       const copy = row.createDiv({ cls: "ts-project-activity-copy" });
       copy.createDiv({ cls: "ts-project-activity-name", text: project.name });
-      copy.createDiv({ cls: "ts-project-activity-meta", text: `${project.recentCount} 文件 · ${project.lastModified ? this.relTime(project.lastModified) : "—"}` });
+      copy.createDiv({ cls: "ts-project-activity-meta", text: `本周 ${project.recentCount} 文件 · ${project.lastModified ? this.relTime(project.lastModified) : "—"}` });
       const bar = row.createDiv({ cls: "ts-project-activity-bar" });
       bar.createDiv({ cls: "ts-project-activity-fill", attr: { style: `width:${Math.round(project.recentCount / max * 100)}%;--ts-i:${idx}` } });
     });

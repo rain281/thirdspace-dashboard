@@ -54,6 +54,12 @@ export interface ProjectIndexEntry {
   codex_context?: string;
 }
 export interface ProjectActivity { id: string; name: string; workspace: string; lifecycle: string; recentCount: number; lastModified: number; }
+export interface ProjectActivityOptions {
+  period?: "rolling" | "week";
+  days?: number;
+  limit?: number;
+  now?: Date;
+}
 export interface GitRepoActivity { id: string; name: string; branch: string; count: number; lastCommit: number; }
 export interface GitActivitySummary { days: DailyActivity[]; repos: GitRepoActivity[]; total: number; }
 export interface TodoItem        { text: string; done: boolean; }
@@ -317,17 +323,23 @@ export async function getDailyActivity(app: App, days = 365): Promise<DailyActiv
   return Object.entries(countMap).map(([date,count])=>({date,count})).sort((a,b)=>a.date.localeCompare(b.date));
 }
 
-export async function getProjectActivity(app: App, days = 90): Promise<ProjectActivity[]> {
+export async function getProjectActivity(app: App, options: number | ProjectActivityOptions = 90): Promise<ProjectActivity[]> {
   const projects = filterManagedProjectIndexEntries(await loadProjectIndex(app));
   const allFiles = await listMarkdownFiles(app);
-  const cutoff = Date.now() - days * 86_400_000;
-  return projects.map(project => {
+  const opts: ProjectActivityOptions = typeof options === "number" ? { period: "rolling", days: options } : options;
+  const now = opts.now ?? new Date();
+  const period = opts.period ?? "rolling";
+  const cutoff = period === "week"
+    ? isoWeekStart(now).getTime()
+    : now.getTime() - (opts.days ?? 90) * 86_400_000;
+  const activity = projects.map(project => {
     const files = allFiles.filter(f =>
       f.path.startsWith(project.workspace + "/") &&
       !shouldSkip(f)
     );
-    const recentCount = files.filter(f => fileModified(app, f) > cutoff).length;
-    const lastModified = files.reduce((max, f) => Math.max(max, fileModified(app, f)), 0);
+    const activeFiles = files.filter(f => fileModified(app, f) >= cutoff);
+    const recentCount = activeFiles.length;
+    const lastModified = activeFiles.reduce((max, f) => Math.max(max, fileModified(app, f)), 0);
     return {
       id: project.id,
       name: project.name,
@@ -336,7 +348,10 @@ export async function getProjectActivity(app: App, days = 90): Promise<ProjectAc
       recentCount,
       lastModified,
     };
-  }).sort((a, b) => b.recentCount - a.recentCount || b.lastModified - a.lastModified);
+  })
+    .filter(project => period !== "week" || project.recentCount > 0)
+    .sort((a, b) => b.recentCount - a.recentCount || b.lastModified - a.lastModified);
+  return typeof opts.limit === "number" ? activity.slice(0, opts.limit) : activity;
 }
 
 export async function getGitActivity(app: App, days = 90): Promise<GitActivitySummary> {

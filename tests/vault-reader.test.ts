@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   filterManagedProjectIndexEntries,
   getGitActivity,
+  getProjectActivity,
   loadProjectBacklog,
   loadTodayWorklog,
   loadWeeklyWorklogs,
@@ -30,6 +31,88 @@ const activityProjects = filterManagedProjectIndexEntries([
 ]);
 
 assert.deepEqual(activityProjects.map(project => project.id), ["kora", "pilot"]);
+
+const mondayNoon = new Date("2026-06-15T12:00:00+08:00");
+const projectActivityFileTimes = new Map<string, number>([
+  ["04-项目/产品系统/Kora/a.md", new Date("2026-06-15T09:00:00+08:00").getTime()],
+  ["04-项目/产品系统/Kora/b.md", new Date("2026-06-15T10:00:00+08:00").getTime()],
+  ["04-项目/产品系统/Kora/c.md", new Date("2026-06-15T11:00:00+08:00").getTime()],
+  ["04-项目/产品系统/Kora/d.md", new Date("2026-06-15T11:30:00+08:00").getTime()],
+  ["04-项目/产品系统/Pilot/a.md", new Date("2026-06-15T08:00:00+08:00").getTime()],
+  ["04-项目/产品系统/Pilot/b.md", new Date("2026-06-15T08:30:00+08:00").getTime()],
+  ["04-项目/产品系统/Pilot/c.md", new Date("2026-06-15T09:30:00+08:00").getTime()],
+  ["04-项目/产品系统/AIDV/a.md", new Date("2026-06-15T07:00:00+08:00").getTime()],
+  ["04-项目/产品系统/AIDV/b.md", new Date("2026-06-15T07:30:00+08:00").getTime()],
+  ["04-项目/产品系统/AI漫剧/a.md", new Date("2026-06-15T06:00:00+08:00").getTime()],
+  ["04-项目/产品系统/Old/a.md", new Date("2026-06-14T22:00:00+08:00").getTime()],
+  ["99-归档/完结项目/Archive/a.md", new Date("2026-06-15T11:45:00+08:00").getTime()],
+]);
+const projectActivityApp = {
+  vault: {
+    adapter: {
+      async list() {
+        return {
+          files: Array.from(projectActivityFileTimes.keys()),
+          folders: [],
+        };
+      },
+      async stat(path: string) {
+        const mtime = projectActivityFileTimes.get(path);
+        if (!mtime) throw new Error(`missing stat ${path}`);
+        return { ctime: mtime, mtime, size: 1 };
+      },
+      async read(path: string) {
+        if (path === ".thirdspace/project-index.yaml") return [
+          'version: "1.0"',
+          "projects:",
+          '  - id: "kora"',
+          '    name: "Kora"',
+          '    workspace: "04-项目/产品系统/Kora"',
+          '    lifecycle: "active"',
+          '  - id: "pilot"',
+          '    name: "Pilot"',
+          '    workspace: "04-项目/产品系统/Pilot"',
+          '    lifecycle: "active"',
+          '  - id: "aidv"',
+          '    name: "AIDV"',
+          '    workspace: "04-项目/产品系统/AIDV"',
+          '    lifecycle: "watch"',
+          '  - id: "comic"',
+          '    name: "AI漫剧"',
+          '    workspace: "04-项目/产品系统/AI漫剧"',
+          '    lifecycle: "active"',
+          '  - id: "old"',
+          '    name: "Old"',
+          '    workspace: "04-项目/产品系统/Old"',
+          '    lifecycle: "active"',
+          '  - id: "archive"',
+          '    name: "Archive"',
+          '    workspace: "99-归档/完结项目/Archive"',
+          '    lifecycle: "archived"',
+          "",
+        ].join("\n");
+        throw new Error(`missing read ${path}`);
+      },
+    },
+    getAbstractFileByPath() {
+      return null;
+    },
+  },
+  metadataCache: {
+    getFileCache() {
+      return null;
+    },
+  },
+};
+
+const weeklyProjectActivity = await getProjectActivity(projectActivityApp as any, {
+  period: "week",
+  limit: 3,
+  now: mondayNoon,
+} as any);
+assert.deepEqual(weeklyProjectActivity.map(project => project.name), ["Kora", "Pilot", "AIDV"]);
+assert.deepEqual(weeklyProjectActivity.map(project => project.recentCount), [4, 3, 2]);
+assert.equal(weeklyProjectActivity[0]?.lastModified, new Date("2026-06-15T11:30:00+08:00").getTime());
 
 const files = new Map<string, string>([
   ["02-日记/工作日志/20260609_工作日志_周二.md", [
