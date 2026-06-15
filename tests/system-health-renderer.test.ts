@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { renderSystemHealth } from "../src/components/system-health";
 
 class FakeElement {
+  tag = "div";
   cls = "";
   text = "";
   children: FakeElement[] = [];
+  private listeners: Record<string, Array<(event: { stopPropagation: () => void }) => void>> = {};
 
-  constructor(cls = "", text = "") {
+  constructor(cls = "", text = "", tag = "div") {
     this.cls = cls;
     this.text = text;
+    this.tag = tag;
   }
 
   createDiv(options: { cls?: string; text?: string } = {}): FakeElement {
@@ -16,7 +19,30 @@ class FakeElement {
   }
 
   createSpan(options: { cls?: string; text?: string } = {}): FakeElement {
-    return this.append(new FakeElement(options.cls ?? "", options.text ?? ""));
+    return this.append(new FakeElement(options.cls ?? "", options.text ?? "", "span"));
+  }
+
+  createEl(tag: string, options: { cls?: string; text?: string; attr?: Record<string, string> } = {}): FakeElement {
+    return this.append(new FakeElement(options.cls ?? "", options.text ?? "", tag));
+  }
+
+  empty(): void {
+    this.children = [];
+    this.text = "";
+  }
+
+  setText(text: string): void {
+    this.text = text;
+  }
+
+  addEventListener(event: string, listener: (event: { stopPropagation: () => void }) => void): void {
+    this.listeners[event] = [...(this.listeners[event] ?? []), listener];
+  }
+
+  click(): void {
+    for (const listener of this.listeners.click ?? []) {
+      listener({ stopPropagation: () => undefined });
+    }
   }
 
   textContent(): string {
@@ -76,6 +102,22 @@ assert.match(text, /最近 4/);
 assert.match(text, /工作区 8/);
 assert.match(text, /仓库 2/);
 assert.match(text, /焦点 YAML 与周计划不一致/);
-assert.match(text, /周计划缺复盘/);
+assert.doesNotMatch(text, /周计划缺复盘/);
 assert.doesNotMatch(text, /项目状态缺标准 section/);
-assert.match(text, /\+1 条未显示/);
+assert.doesNotMatch(text, /\+1 条未显示/);
+assert.match(text, /1\/3/);
+assert.ok(parent.findByClass("ts-system-health-prev"), "previous issue button exists");
+assert.ok(parent.findByClass("ts-system-health-next"), "next issue button exists");
+
+parent.findByClass("ts-system-health-next")?.click();
+const nextText = parent.textContent();
+assert.match(nextText, /2\/3/);
+assert.doesNotMatch(nextText, /焦点 YAML 与周计划不一致/);
+assert.match(nextText, /周计划缺复盘/);
+assert.doesNotMatch(nextText, /项目状态缺标准 section/);
+
+parent.findByClass("ts-system-health-prev")?.click();
+const previousText = parent.textContent();
+assert.match(previousText, /1\/3/);
+assert.match(previousText, /焦点 YAML 与周计划不一致/);
+assert.doesNotMatch(previousText, /周计划缺复盘/);

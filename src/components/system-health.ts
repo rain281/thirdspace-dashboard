@@ -27,19 +27,11 @@ export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel
   const issuePanel = card.createDiv({ cls: "ts-system-health-issue-panel" });
   const issueHead = issuePanel.createDiv({ cls: "ts-system-health-section-head" });
   issueHead.createDiv({ cls: "ts-system-health-section-title", text: "维护信号" });
-  issueHead.createDiv({ cls: "ts-system-health-section-meta", text: issues.length > 0 ? `${issues.length} 条` : "暂无" });
-
-  const list = issuePanel.createDiv({ cls: "ts-system-health-issues" });
   if (issues.length > 0) {
-    for (const issue of issues.slice(0, 2)) {
-      const row = list.createDiv({ cls: "ts-system-health-issue" });
-      row.createDiv({ cls: "ts-system-health-issue-title", text: issue.label });
-      row.createDiv({ cls: "ts-system-health-issue-detail", text: issue.detail });
-    }
-    if (issues.length > 2) {
-      list.createDiv({ cls: "ts-system-health-more", text: `+${issues.length - 2} 条未显示` });
-    }
+    renderIssueSwitcher(issueHead, issuePanel, issues);
   } else {
+    issueHead.createDiv({ cls: "ts-system-health-section-meta", text: "暂无" });
+    const list = issuePanel.createDiv({ cls: "ts-system-health-issues" });
     list.createDiv({ cls: "ts-system-health-empty", text: "暂无维护信号" });
   }
 
@@ -58,6 +50,58 @@ function metric(parent: HTMLElement, value: string, label: string): void {
   const item = parent.createDiv({ cls: "ts-system-health-metric" });
   item.createDiv({ cls: "ts-system-health-value", text: value });
   item.createDiv({ cls: "ts-system-health-label", text: label });
+}
+
+function renderIssueSwitcher(
+  head: HTMLElement,
+  panel: HTMLElement,
+  issues: Array<{ label: string; detail: string }>,
+): void {
+  let selected = 0;
+  const controls = head.createDiv({ cls: "ts-system-health-switcher" });
+  const prev = controls.createEl("button", {
+    cls: "ts-system-health-switch ts-system-health-prev",
+    text: "‹",
+    attr: {
+      type: "button",
+      "aria-label": "上一条维护信号",
+      title: "上一条维护信号",
+    },
+  });
+  const meta = controls.createSpan({ cls: "ts-system-health-section-meta" });
+  const next = controls.createEl("button", {
+    cls: "ts-system-health-switch ts-system-health-next",
+    text: "›",
+    attr: {
+      type: "button",
+      "aria-label": "下一条维护信号",
+      title: "下一条维护信号",
+    },
+  });
+  const list = panel.createDiv({ cls: "ts-system-health-issues" });
+
+  const renderSelected = () => {
+    const issue = issues[selected];
+    meta.setText(`${selected + 1}/${issues.length}`);
+    list.empty();
+    const row = list.createDiv({ cls: "ts-system-health-issue" });
+    row.createDiv({ cls: "ts-system-health-issue-title", text: issue.label });
+    row.createDiv({ cls: "ts-system-health-issue-detail", text: issue.detail });
+  };
+
+  prev.disabled = issues.length <= 1;
+  next.disabled = issues.length <= 1;
+  prev.addEventListener("click", event => {
+    event.stopPropagation();
+    selected = (selected - 1 + issues.length) % issues.length;
+    renderSelected();
+  });
+  next.addEventListener("click", event => {
+    event.stopPropagation();
+    selected = (selected + 1) % issues.length;
+    renderSelected();
+  });
+  renderSelected();
 }
 
 function contextChip(parent: HTMLElement, label: string, value: string): void {

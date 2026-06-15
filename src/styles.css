@@ -1310,6 +1310,46 @@
   white-space: nowrap;
 }
 
+.ts-system-health-switcher {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ts-system-health-switch {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ts-yellow) 32%, var(--ts-border) 68%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent 22%);
+  color: var(--ts-text-2);
+  font-family: var(--ts-mono);
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ts-system-health-switch:hover {
+  border-color: color-mix(in srgb, var(--ts-yellow) 62%, var(--ts-border) 38%);
+  background: color-mix(in srgb, var(--ts-yellow) 10%, var(--background-primary) 90%);
+  color: var(--ts-text);
+}
+
+.ts-system-health-switch:disabled {
+  cursor: default;
+  opacity: .42;
+}
+
 .ts-system-health-issues {
   min-height: 0;
   margin-top: 0;
