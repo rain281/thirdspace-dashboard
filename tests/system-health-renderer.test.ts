@@ -23,6 +23,20 @@ class FakeElement {
     return [this.text, ...this.children.map(child => child.textContent())].filter(Boolean).join(" ");
   }
 
+  findByClass(cls: string): FakeElement | undefined {
+    if (this.cls.split(/\s+/).includes(cls)) return this;
+    for (const child of this.children) {
+      const found = child.findByClass(cls);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
+  findAllByClass(cls: string): FakeElement[] {
+    const current = this.cls.split(/\s+/).includes(cls) ? [this] : [];
+    return [...current, ...this.children.flatMap(child => child.findAllByClass(cls))];
+  }
+
   private append(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
@@ -51,10 +65,17 @@ assert.match(text, /9 个维护信号/);
 assert.match(text, /2 候选/);
 assert.match(text, /1 接入/);
 assert.match(text, /3 资料/);
-assert.match(text, /4 最近/);
-assert.match(text, /8 工作区/);
-assert.match(text, /2 Git仓库/);
-assert.match(text, /3 写入一致性/);
+assert.match(text, /3 写入/);
+assert.equal(parent.findAllByClass("ts-system-health-metric").length, 4);
+assert.ok(parent.findByClass("ts-system-health-issue-panel"), "issue panel exists");
+assert.ok(parent.findByClass("ts-system-health-context"), "context footer exists");
+assert.doesNotMatch(text, /4 最近/);
+assert.doesNotMatch(text, /8 工作区/);
+assert.doesNotMatch(text, /2 Git仓库/);
+assert.match(text, /最近 4/);
+assert.match(text, /工作区 8/);
+assert.match(text, /仓库 2/);
 assert.match(text, /焦点 YAML 与周计划不一致/);
 assert.match(text, /周计划缺复盘/);
-assert.match(text, /项目状态缺标准 section/);
+assert.doesNotMatch(text, /项目状态缺标准 section/);
+assert.match(text, /\+1 条未显示/);
