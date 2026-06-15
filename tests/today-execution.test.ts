@@ -229,7 +229,7 @@ const focusTodoAction = selectTodayNextAction({
 
 assert.equal(focusTodoAction.tone, "todo");
 assert.equal(focusTodoAction.title, "Kora：完成 Today execution model");
-assert.match(focusTodoAction.reason, /Focus/);
+assert.match(focusTodoAction.reason, /焦点/);
 
 const backlogFirstOffFocus = [
   backlog[1],
@@ -253,7 +253,7 @@ const focusBacklogAction = selectTodayNextAction({
 
 assert.equal(focusBacklogAction.tone, "pool");
 assert.equal(focusBacklogAction.projectItem?.project, "Kora");
-assert.match(focusBacklogAction.reason, /Focus/);
+assert.match(focusBacklogAction.reason, /焦点/);
 
 const projectNextStepExecution = deriveTodayExecution(noPendingToday, portfolio, [], {
   ...focusCoverage,
@@ -269,7 +269,7 @@ const projectNextStepAction = selectTodayNextAction({
 
 assert.equal(projectNextStepAction.tone, "todo");
 assert.match(projectNextStepAction.title, /Kora：实现 Today execution model/);
-assert.match(projectNextStepAction.reason, /Focus/);
+assert.match(projectNextStepAction.reason, /焦点/);
 
 const offFocusOnlyToday: TodayWorklog = {
   ...today,
@@ -289,9 +289,9 @@ const offFocusAction = selectTodayNextAction({
   todayLogPath: "02-日记/工作日志/20260611_工作日志_周四.md",
 });
 
-assert.equal(offFocusAction.badge, "OFF-FOCUS");
+assert.equal(offFocusAction.badge, "非焦点");
 assert.equal(offFocusAction.title, "AI漫剧：临时整理设定");
-assert.match(offFocusAction.reason, /off-focus/);
+assert.match(offFocusAction.reason, /非焦点/);
 
 const portfolioWithoutFocusNextStep: PortfolioModel = {
   ...portfolio,
@@ -310,5 +310,5 @@ const offFocusBacklogAction = selectTodayNextAction({
 });
 
 assert.equal(offFocusBacklogAction.tone, "pool");
-assert.equal(offFocusBacklogAction.badge, "OFF-FOCUS");
+assert.equal(offFocusBacklogAction.badge, "非焦点");
 assert.equal(offFocusBacklogAction.projectItem?.project, "AI漫剧");

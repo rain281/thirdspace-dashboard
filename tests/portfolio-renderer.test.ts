@@ -136,9 +136,9 @@ renderPortfolio(
 );
 
 const text = parent.textContent();
-assert.match(text, /PORTFOLIO HEALTH/);
-assert.match(text, /WEEKLY FOCUS/);
-assert.match(text, /确认下周 Focus/);
+assert.match(text, /项目组合健康/);
+assert.match(text, /本周焦点/);
+assert.match(text, /确认下周焦点/);
 assert.match(text, /Kora/);
 assert.match(text, /P0/);
 assert.match(text, /交付/);
@@ -200,7 +200,7 @@ renderPortfolio(
   { openFile: () => undefined },
 );
 
-assert.match(emptyParent.textContent(), /No managed Portfolio projects/);
+assert.match(emptyParent.textContent(), /暂无托管项目/);
 
 const pendingFocusParent = new FakeElement();
 renderPortfolio(
@@ -221,7 +221,7 @@ renderPortfolio(
   { openFile: () => undefined },
 );
 
-assert.match(pendingFocusParent.textContent(), /Weekly Focus pending confirmation/);
+assert.match(pendingFocusParent.textContent(), /本周焦点待确认/);
 
 const openedDetail: string[] = [];
 const routeOpened: string[] = [];
@@ -237,6 +237,7 @@ renderPortfolio(
 
 const detailText = detailParent.textContent();
 assert.doesNotMatch(detailText, /PROJECT DETAIL/);
+assert.doesNotMatch(detailText, /项目详情/);
 assert.match(detailText, /Kora/);
 
 detailParent.findByClass("ts-project-card")?.click();

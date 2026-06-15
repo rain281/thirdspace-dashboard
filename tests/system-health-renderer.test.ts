@@ -39,21 +39,22 @@ renderSystemHealth(parent as unknown as HTMLElement, {
   workspaceCount: 8,
   gitRepoCount: 2,
   writeConsistencyIssues: [
-    { label: "Focus YAML 与周计划不一致", detail: "2026-W25 缺周计划镜像" },
+    { label: "焦点 YAML 与周计划不一致", detail: "2026-W25 缺周计划镜像" },
     { label: "周计划缺复盘", detail: "2026-W24" },
     { label: "项目状态缺标准 section", detail: "Kora 缺 ## 待决策" },
   ],
 });
 
 const text = parent.textContent();
-assert.match(text, /DATA HEALTH/);
-assert.match(text, /2 candidates/);
-assert.match(text, /1 onboarding/);
-assert.match(text, /3 materials/);
-assert.match(text, /4 recent/);
-assert.match(text, /8 workspaces/);
-assert.match(text, /2 git repos/);
-assert.match(text, /3 write consistency/);
-assert.match(text, /Focus YAML 与周计划不一致/);
+assert.match(text, /数据健康/);
+assert.match(text, /9 个维护信号/);
+assert.match(text, /2 候选/);
+assert.match(text, /1 接入/);
+assert.match(text, /3 资料/);
+assert.match(text, /4 最近/);
+assert.match(text, /8 工作区/);
+assert.match(text, /2 Git仓库/);
+assert.match(text, /3 写入一致性/);
+assert.match(text, /焦点 YAML 与周计划不一致/);
 assert.match(text, /周计划缺复盘/);
 assert.match(text, /项目状态缺标准 section/);

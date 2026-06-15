@@ -425,7 +425,7 @@ const writeConsistencyIssues = deriveWriteConsistencyIssues({
 });
 
 assert.deepEqual(writeConsistencyIssues.map(issue => issue.label), [
-  "Focus YAML 与周计划不一致",
+  "焦点 YAML 与周计划不一致",
   "周计划缺复盘",
   "项目状态缺标准 section",
 ]);

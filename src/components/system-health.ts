@@ -14,17 +14,17 @@ export interface SystemHealthModel {
 export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel): void {
   const card = parent.createDiv({ cls: "ts-card ts-compact-card ts-system-health-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "DATA HEALTH" });
+  head.createSpan({ cls: "ts-card-label", text: "数据健康" });
   head.createSpan({ cls: "ts-card-meta", text: systemStatus(model) });
 
   const grid = card.createDiv({ cls: "ts-system-health-grid" });
-  metric(grid, String(model.discoveryPending), "candidates");
-  metric(grid, String(model.onboardingPending), "onboarding");
-  metric(grid, String(model.materialsPending), "materials");
-  metric(grid, String(model.recentCount), "recent");
-  metric(grid, String(model.workspaceCount), "workspaces");
-  metric(grid, String(model.gitRepoCount), "git repos");
-  metric(grid, String(model.writeConsistencyIssues?.length ?? 0), "write consistency");
+  metric(grid, String(model.discoveryPending), "候选");
+  metric(grid, String(model.onboardingPending), "接入");
+  metric(grid, String(model.materialsPending), "资料");
+  metric(grid, String(model.recentCount), "最近");
+  metric(grid, String(model.workspaceCount), "工作区");
+  metric(grid, String(model.gitRepoCount), "Git仓库");
+  metric(grid, String(model.writeConsistencyIssues?.length ?? 0), "写入一致性");
 
   if (model.writeConsistencyIssues && model.writeConsistencyIssues.length > 0) {
     const list = card.createDiv({ cls: "ts-system-health-issues" });
@@ -38,7 +38,7 @@ export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel
 
 function systemStatus(model: SystemHealthModel): string {
   const pending = model.discoveryPending + model.onboardingPending + model.materialsPending + (model.writeConsistencyIssues?.length ?? 0);
-  return pending > 0 ? `${pending} maintenance signals` : "maintenance clear";
+  return pending > 0 ? `${pending} 个维护信号` : "维护正常";
 }
 
 function metric(parent: HTMLElement, value: string, label: string): void {

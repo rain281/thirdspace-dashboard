@@ -26,9 +26,9 @@ export function buildGitActivityCardModel(activity: GitActivitySummary): GitActi
     totalLabel: String(activity.total),
     todayLabel: String(activity.days[activity.days.length - 1]?.count ?? 0),
     topRepoLabel: topRepo?.name ?? "-",
-    topRepoMeta: topRepo ? commitLabel(topRepo.count) : "no commits",
+    topRepoMeta: topRepo ? commitLabel(topRepo.count) : "无提交",
     latestRepoLabel: latestRepo?.name ?? "-",
-    latestRepoMeta: latestRepo ? latestRepo.branch || "-" : "no commits",
+    latestRepoMeta: latestRepo ? latestRepo.branch || "-" : "无提交",
     repoRows: visibleRepos.map(repo => repoRow(repo, repoMax)),
   };
 }
@@ -43,5 +43,5 @@ function repoRow(repo: GitRepoActivity, repoMax: number): GitActivityCardRepoRow
 }
 
 function commitLabel(count: number): string {
-  return `${count} ${count === 1 ? "commit" : "commits"}`;
+  return `${count} 次`;
 }

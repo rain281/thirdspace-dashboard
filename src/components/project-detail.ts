@@ -16,11 +16,11 @@ export function renderProjectDetailPage(
   const head = shell.createDiv({ cls: "ts-detail-route-head" });
   const back = head.createEl("button", { cls: "ts-detail-back-btn", text: "返回项目组合" });
   back.addEventListener("click", () => actions.backToPortfolio());
-  head.createDiv({ cls: "ts-card-label", text: "PROJECT DETAIL" });
+  head.createDiv({ cls: "ts-card-label", text: "项目详情" });
 
   if (!project) {
     shell.createDiv({ cls: "ts-card ts-project-detail-card ts-project-detail-card--empty" })
-      .createDiv({ cls: "ts-empty", text: "No project selected" });
+      .createDiv({ cls: "ts-empty", text: "未选择项目" });
     return;
   }
 
@@ -31,33 +31,33 @@ export function renderProjectDetailPage(
   const reasons = project.health.reasons.slice(0, 3);
   identity.createDiv({
     cls: "ts-detail-health-reasons",
-    text: reasons.length > 0 ? reasons.join(" · ") : "No active health reasons",
+    text: reasons.length > 0 ? reasons.join(" · ") : "暂无健康原因",
   });
   const chips = hero.createDiv({ cls: "ts-detail-chips" });
-  detailChip(chips, "Priority", project.priority, "priority");
-  detailChip(chips, "Stage", project.stage, "stage");
-  detailChip(chips, "Lifecycle", project.lifecycle, "lifecycle");
-  detailChip(chips, "Health", project.health.status, "health");
-  if (project.focusRole) detailChip(chips, "Focus", project.focusRole, "focus");
-  detailChip(chips, "Updated", project.updated || "-", "updated");
+  detailChip(chips, "优先级", project.priority, "priority");
+  detailChip(chips, "阶段", project.stage, "stage");
+  detailChip(chips, "周期", project.lifecycle, "lifecycle");
+  detailChip(chips, "健康", project.health.status, "health");
+  if (project.focusRole) detailChip(chips, "焦点", project.focusRole, "focus");
+  detailChip(chips, "更新", project.updated || "-", "updated");
 
   const grid = card.createDiv({ cls: "ts-detail-grid ts-detail-page-grid" });
   const main = grid.createDiv({ cls: "ts-detail-panel ts-detail-main" });
   main.createDiv({ cls: "ts-detail-panel-label", text: "推进判断" });
-  detailSection(main, "Goal", project.goal, "goal", 2);
-  detailSection(main, "Success", project.successCriteria, "success", 3);
-  detailSection(main, "Milestone", project.milestone, "milestone", 2);
-  detailSection(main, "Next Step", project.nextStep, "next", 3);
+  detailSection(main, "目标", project.goal, "goal", 2);
+  detailSection(main, "成功标准", project.successCriteria, "success", 3);
+  detailSection(main, "里程碑", project.milestone, "milestone", 2);
+  detailSection(main, "下一步", project.nextStep, "next", 3);
 
   const riskPanel = grid.createDiv({ cls: "ts-detail-panel ts-detail-risk-panel" });
   riskPanel.createDiv({ cls: "ts-detail-panel-label", text: "风险判断" });
-  detailSection(riskPanel, "Risks", project.risks, "risks", 3);
-  detailSection(riskPanel, "Decisions", project.pendingDecisions, "decisions", 3);
-  detailSection(riskPanel, "Gates", project.deliveryGates, "gates", 3);
+  detailSection(riskPanel, "风险", project.risks, "risks", 3);
+  detailSection(riskPanel, "待决策", project.pendingDecisions, "decisions", 3);
+  detailSection(riskPanel, "交付门禁", project.deliveryGates, "gates", 3);
 
   const contextPanel = grid.createDiv({ cls: "ts-detail-panel ts-detail-context-panel" });
   contextPanel.createDiv({ cls: "ts-detail-panel-label", text: "接续判断" });
-  detailSection(contextPanel, "Recent Status", project.recentStatus, "recent", 2);
+  detailSection(contextPanel, "最近状态", project.recentStatus, "recent", 2);
   renderContextReadiness(contextPanel, project);
   renderQuickLinks(contextPanel, project, actions);
 
@@ -79,7 +79,7 @@ function detailSection(parent: HTMLElement, label: string, markdown: string, key
 
 function renderContextReadiness(parent: HTMLElement, project: ManagedProject): void {
   const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--readiness" });
-  section.createDiv({ cls: "ts-detail-section-label", text: "Context Readiness" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "上下文就绪" });
   const row = section.createDiv({ cls: "ts-detail-readiness" });
   readinessChip(row, "首页", Boolean(project.projectHome));
   readinessChip(row, "状态", Boolean(project.statusNote));
@@ -90,7 +90,7 @@ function renderContextReadiness(parent: HTMLElement, project: ManagedProject): v
 function renderProjectDetailActions(parent: HTMLElement, project: ManagedProject, actions: ProjectDetailActions): void {
   if (!actions.projectDetailAction || project.lifecycle === "archived" || !project.statusNote) return;
   const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--actions ts-detail-action-panel" });
-  section.createDiv({ cls: "ts-detail-section-label", text: "Actions" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "操作" });
   const row = section.createDiv({ cls: "ts-detail-actions" });
   detailAction(row, "更新下一步", "next-step", project, actions);
   detailAction(row, "新增风险", "risk", project, actions);
@@ -123,7 +123,7 @@ function detailChip(parent: HTMLElement, label: string, value: string, key: stri
 
 function renderQuickLinks(parent: HTMLElement, project: ManagedProject, actions: ProjectDetailActions): void {
   const section = parent.createDiv({ cls: "ts-detail-section ts-detail-section--links" });
-  section.createDiv({ cls: "ts-detail-section-label", text: "Quick Links" });
+  section.createDiv({ cls: "ts-detail-section-label", text: "快速链接" });
   const links = section.createDiv({ cls: "ts-detail-links" });
   quickLink(links, "状态笔记", project.statusNote, actions);
   quickLink(links, "首页", project.projectHome, actions);

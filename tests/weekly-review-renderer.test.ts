@@ -120,20 +120,20 @@ renderWeeklyReview(parent as unknown as HTMLElement, model, {
 });
 
 const text = parent.textContent();
-assert.match(text, /WEEKLY REVIEW/);
+assert.match(text, /周复盘/);
 assert.match(text, /写入周复盘/);
 assert.match(text, /2026-W24/);
-assert.match(text, /FOCUS REVIEW/);
+assert.match(text, /焦点复盘/);
 assert.match(text, /Kora/);
 assert.match(text, /AIDV/);
-assert.match(text, /OUTCOMES/);
+assert.match(text, /本周产出/);
 assert.match(text, /完成 Portfolio/);
-assert.match(text, /OFF-FOCUS/);
+assert.match(text, /非焦点/);
 assert.match(text, /AI漫剧/);
-assert.match(text, /RISKS \/ DECISIONS/);
+assert.match(text, /风险 \/ 决策/);
 assert.match(text, /发布门禁未关闭/);
 assert.match(text, /Mail\.app 权限/);
-assert.match(text, /NEXT WEEK/);
+assert.match(text, /下周建议/);
 assert.match(text, /继续主项目 Kora/);
 assert.equal(parent.findAllByClass("ts-review-section").length, 5);
 

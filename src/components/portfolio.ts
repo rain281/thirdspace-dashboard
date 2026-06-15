@@ -25,22 +25,22 @@ export function renderPortfolio(
 function renderPortfolioHealth(parent: HTMLElement, model: PortfolioModel): void {
   const card = parent.createDiv({ cls: "ts-card ts-portfolio-health-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "PORTFOLIO HEALTH" });
-  head.createSpan({ cls: "ts-card-meta", text: `${model.summary.activeCount} active · ${model.summary.watchCount} watch` });
+  head.createSpan({ cls: "ts-card-label", text: "项目组合健康" });
+  head.createSpan({ cls: "ts-card-meta", text: `${model.summary.activeCount} 活跃 · ${model.summary.watchCount} 观察` });
   const grid = card.createDiv({ cls: "ts-portfolio-metrics" });
-  metric(grid, String(model.summary.totalManaged), "managed");
-  metric(grid, `${model.summary.focusUsed}/${model.summary.focusLimit}`, "focus");
-  metric(grid, String(model.summary.riskCount), "risk");
-  metric(grid, String(model.summary.attentionCount), "attention");
-  metric(grid, String(model.summary.staleCount), "stale");
-  metric(grid, String(model.summary.noNextStepCount), "no next");
-  metric(grid, String(model.summary.deliveryGateGapCount), "gate gaps");
+  metric(grid, String(model.summary.totalManaged), "托管");
+  metric(grid, `${model.summary.focusUsed}/${model.summary.focusLimit}`, "焦点");
+  metric(grid, String(model.summary.riskCount), "风险");
+  metric(grid, String(model.summary.attentionCount), "注意");
+  metric(grid, String(model.summary.staleCount), "过期");
+  metric(grid, String(model.summary.noNextStepCount), "缺下一步");
+  metric(grid, String(model.summary.deliveryGateGapCount), "门禁缺口");
 }
 
 function renderWeeklyFocus(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-weekly-focus-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "WEEKLY FOCUS" });
+  head.createSpan({ cls: "ts-card-label", text: "本周焦点" });
   head.createSpan({ cls: "ts-card-meta", text: model.focusWeek.week });
 
   const focusProjects = model.projects.filter(project => project.focusRole);
@@ -56,9 +56,9 @@ function renderWeeklyFocus(parent: HTMLElement, model: PortfolioModel, actions: 
 function renderFocusSuggestions(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-focus-suggestions-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "FOCUS SUGGESTIONS" });
+  head.createSpan({ cls: "ts-card-label", text: "焦点建议" });
   if (actions.confirmWeeklyFocus) {
-    const btn = head.createEl("button", { cls: "ts-focus-confirm-btn", text: "确认下周 Focus" });
+    const btn = head.createEl("button", { cls: "ts-focus-confirm-btn", text: "确认下周焦点" });
     btn.addEventListener("click", event => {
       event.stopPropagation();
       actions.confirmWeeklyFocus?.();
@@ -70,7 +70,7 @@ function renderFocusSuggestions(parent: HTMLElement, model: PortfolioModel, acti
     .slice(0, 4);
 
   if (suggestions.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: model.projects.length === 0 ? "No managed Portfolio projects" : "No Focus suggestions" });
+    card.createDiv({ cls: "ts-empty", text: model.projects.length === 0 ? "暂无托管项目" : "暂无焦点建议" });
     return;
   }
 
@@ -80,13 +80,13 @@ function renderFocusSuggestions(parent: HTMLElement, model: PortfolioModel, acti
 
 function renderRiskDecisionQueue(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-risk-queue-card" });
-  card.createDiv({ cls: "ts-card-label", text: "RISK / DECISIONS" });
+  card.createDiv({ cls: "ts-card-label", text: "风险 / 决策" });
   const items = model.projects
     .filter(project => project.health.status === "风险" || compact(project.pendingDecisions))
     .slice(0, 6);
 
   if (items.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: "No active risk or decision queue" });
+    card.createDiv({ cls: "ts-empty", text: "暂无活跃风险或待决策" });
     return;
   }
 
@@ -102,10 +102,10 @@ function renderRiskDecisionQueue(parent: HTMLElement, model: PortfolioModel, act
 
 function renderPriorityProjects(parent: HTMLElement, model: PortfolioModel, actions: PortfolioActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-priority-card" });
-  card.createDiv({ cls: "ts-card-label", text: "PRIORITY PROJECTS" });
+  card.createDiv({ cls: "ts-card-label", text: "重点项目" });
   const items = model.projects.filter(project => project.priority === "P0" || project.priority === "P1").slice(0, 6);
   if (items.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: model.projects.length === 0 ? "No managed Portfolio projects" : "No P0 / P1 projects" });
+    card.createDiv({ cls: "ts-empty", text: model.projects.length === 0 ? "暂无托管项目" : "暂无 P0 / P1 项目" });
     return;
   }
   const list = card.createDiv({ cls: "ts-priority-list" });
@@ -134,7 +134,14 @@ function renderProjectCard(parent: HTMLElement, project: ManagedProject, actions
 function renderProjectQueue(parent: HTMLElement, label: string, markdown: string): void {
   const text = compact(markdown);
   if (!text) return;
-  parent.createDiv({ cls: `ts-project-queue ts-project-queue--${label}`, text: `${label}: ${text}` });
+  parent.createDiv({ cls: `ts-project-queue ts-project-queue--${label}`, text: `${projectQueueLabel(label)}: ${text}` });
+}
+
+function projectQueueLabel(label: string): string {
+  if (label === "risk") return "风险";
+  if (label === "decision") return "决策";
+  if (label === "gate") return "门禁";
+  return label;
 }
 
 function metric(parent: HTMLElement, value: string, label: string): void {
@@ -172,7 +179,7 @@ function healthClass(status: ProjectHealthStatus): string {
 }
 
 function emptyPortfolioText(model: PortfolioModel): string {
-  if (model.projects.length === 0) return "No managed Portfolio projects";
-  if (model.focusWeek.confirmationStatus !== "confirmed") return "Weekly Focus pending confirmation";
-  return "No weekly Focus set";
+  if (model.projects.length === 0) return "暂无托管项目";
+  if (model.focusWeek.confirmationStatus !== "confirmed") return "本周焦点待确认";
+  return "暂无本周焦点";
 }

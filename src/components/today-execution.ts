@@ -21,7 +21,7 @@ export function renderTodayExecution(
 }
 
 function renderOutcomes(parent: HTMLElement, outcomes: TodayExecutionOutcome[], actions: TodayExecutionActions): void {
-  const section = createSection(parent, "TODAY OUTCOMES");
+  const section = createSection(parent, "今日产出");
   if (outcomes.length === 0) {
     section.createDiv({ cls: "ts-empty ts-today-exec-empty", text: "写入 ## 今日产出 后显示结果" });
     return;
@@ -38,9 +38,9 @@ function renderOutcomes(parent: HTMLElement, outcomes: TodayExecutionOutcome[], 
 }
 
 function renderRisks(parent: HTMLElement, risks: TodayCommitmentRisk[], actions: TodayExecutionActions): void {
-  const section = createSection(parent, "AT RISK");
+  const section = createSection(parent, "执行风险");
   if (risks.length === 0) {
-    section.createDiv({ cls: "ts-empty ts-today-exec-empty", text: "No execution risks" });
+    section.createDiv({ cls: "ts-empty ts-today-exec-empty", text: "暂无执行风险" });
     return;
   }
   const list = section.createDiv({ cls: "ts-today-exec-list" });
@@ -53,9 +53,9 @@ function renderRisks(parent: HTMLElement, risks: TodayCommitmentRisk[], actions:
 }
 
 function renderDecisions(parent: HTMLElement, decisions: TodayDecisionNeeded[], actions: TodayExecutionActions): void {
-  const section = createSection(parent, "DECISION NEEDED");
+  const section = createSection(parent, "待决策");
   if (decisions.length === 0) {
-    section.createDiv({ cls: "ts-empty ts-today-exec-empty", text: "No pending decisions" });
+    section.createDiv({ cls: "ts-empty ts-today-exec-empty", text: "暂无待决策" });
     return;
   }
   const list = section.createDiv({ cls: "ts-today-exec-list" });
@@ -76,14 +76,14 @@ function createSection(parent: HTMLElement, title: string): HTMLElement {
 }
 
 function riskLabel(kind: TodayCommitmentRisk["kind"]): string {
-  if (kind === "blocked") return "blocked";
-  if (kind === "too-many-todos") return "load";
-  if (kind === "off-focus") return "off-focus";
-  return "output";
+  if (kind === "blocked") return "阻塞";
+  if (kind === "too-many-todos") return "负载";
+  if (kind === "off-focus") return "偏离";
+  return "产出";
 }
 
 function roleLabel(role: NonNullable<TodayDecisionNeeded["role"]>): string {
-  if (role === "main") return "main";
-  if (role === "support") return "support";
-  return "maint";
+  if (role === "main") return "主";
+  if (role === "support") return "副";
+  return "维";
 }

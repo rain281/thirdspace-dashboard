@@ -340,8 +340,8 @@ export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): Writ
       || !weeklyPlanContent.includes("thirdspace-dashboard:start weekly-focus");
     if (missingMirror) {
       issues.push({
-        label: "Focus YAML 与周计划不一致",
-        detail: `${portfolio.focusWeek.week} 缺 Dashboard Focus 镜像`,
+        label: "焦点 YAML 与周计划不一致",
+        detail: `${portfolio.focusWeek.week} 缺 Dashboard 焦点镜像`,
       });
     }
   }
@@ -829,7 +829,7 @@ export function deriveTodayExecution(
   if (focusCoverage.offFocusProjects.length > 0) {
     commitmentsAtRisk.push({
       kind: "off-focus",
-      text: `Off-focus：${focusCoverage.offFocusProjects.join(" / ")}`,
+      text: `非焦点：${focusCoverage.offFocusProjects.join(" / ")}`,
       tone: "notice",
     });
   }
@@ -935,15 +935,15 @@ function normalizeProjectKey(value: string): string {
 }
 
 function nextActionFromHint(hint: TodayNextActionHint, risks: string[]): TodayNextAction {
-  const roleLabel = hint.role ? focusRoleLabel(hint.role) : "OFF-FOCUS";
+  const roleLabel = hint.role ? focusRoleLabel(hint.role) : "非焦点";
   if (hint.kind === "focus-backlog" || hint.kind === "off-focus-backlog") {
     return {
       tone: "pool",
       badge: roleLabel,
       title: hint.text,
       reason: hint.kind === "off-focus-backlog"
-        ? `${hint.projectName} · off-focus 项目池候选`
-        : `${hint.projectName} · Focus 项目池候选`,
+        ? `${hint.projectName} · 非焦点项目池候选`
+        : `${hint.projectName} · 焦点项目池候选`,
       button: "加入今日",
       target: "project",
       projectItem: hint.backlogItem,
@@ -955,8 +955,8 @@ function nextActionFromHint(hint: TodayNextActionHint, risks: string[]): TodayNe
     badge: roleLabel,
     title: hint.text,
     reason: hint.kind === "off-focus-todo"
-      ? `${hint.projectName} · off-focus，低优先级`
-      : `${hint.projectName} · Focus ${hint.kind === "focus-next-step" ? "下一步" : "Todo"}`,
+      ? `${hint.projectName} · 非焦点，低优先级`
+      : `${hint.projectName} · 焦点${hint.kind === "focus-next-step" ? "下一步" : "待办"}`,
     button: "打开",
     target: "today",
     risks,

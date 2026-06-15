@@ -82,11 +82,11 @@ renderTodayExecution(parent as unknown as HTMLElement, execution, {
 });
 
 const text = parent.textContent();
-assert.match(text, /TODAY OUTCOMES/);
+assert.match(text, /今日产出/);
 assert.match(text, /完成 Phase 6 计划/);
-assert.match(text, /AT RISK/);
+assert.match(text, /执行风险/);
 assert.match(text, /blocked by reviewer/);
-assert.match(text, /DECISION NEEDED/);
+assert.match(text, /待决策/);
 assert.match(text, /Pilot/);
 assert.match(text, /Mail\.app/);
 assert.equal(parent.findAllByClass("ts-today-exec-section").length, 3);
@@ -103,5 +103,5 @@ renderTodayExecution(emptyParent as unknown as HTMLElement, {
 
 const emptyText = emptyParent.textContent();
 assert.match(emptyText, /写入 ## 今日产出/);
-assert.match(emptyText, /No execution risks/);
-assert.match(emptyText, /No pending decisions/);
+assert.match(emptyText, /暂无执行风险/);
+assert.match(emptyText, /暂无待决策/);

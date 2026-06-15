@@ -20,7 +20,7 @@ const model = buildGitActivityCardModel(activity);
 assert.equal(model.totalLabel, "12");
 assert.equal(model.todayLabel, "8");
 assert.equal(model.topRepoLabel, "Kora");
-assert.equal(model.topRepoMeta, "7 commits");
+assert.equal(model.topRepoMeta, "7 次");
 assert.equal(model.latestRepoLabel, "Kora");
 assert.equal(model.latestRepoMeta, "main");
 assert.deepEqual(model.repoRows.map(row => [row.name, row.countLabel, row.branch]), [
@@ -32,7 +32,7 @@ const empty = buildGitActivityCardModel({ total: 0, days: [], repos: [] });
 assert.equal(empty.totalLabel, "0");
 assert.equal(empty.todayLabel, "0");
 assert.equal(empty.topRepoLabel, "-");
-assert.equal(empty.topRepoMeta, "no commits");
+assert.equal(empty.topRepoMeta, "无提交");
 assert.equal(empty.latestRepoLabel, "-");
-assert.equal(empty.latestRepoMeta, "no commits");
+assert.equal(empty.latestRepoMeta, "无提交");
 assert.deepEqual(empty.repoRows, []);

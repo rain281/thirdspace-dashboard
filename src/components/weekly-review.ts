@@ -22,8 +22,8 @@ export function renderWeeklyReview(parent: HTMLElement, model: WeeklyReviewModel
 function renderSummary(parent: HTMLElement, model: WeeklyReviewModel, actions: WeeklyReviewActions): void {
   const card = parent.createDiv({ cls: "ts-card ts-review-summary-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
-  head.createSpan({ cls: "ts-card-label", text: "WEEKLY REVIEW" });
-  head.createSpan({ cls: "ts-card-meta", text: `${model.week} · ${model.worklogCount} worklogs` });
+  head.createSpan({ cls: "ts-card-label", text: "周复盘" });
+  head.createSpan({ cls: "ts-card-meta", text: `${model.week} · ${model.worklogCount} 篇日志` });
   if (actions.onWriteWeeklyReview) {
     const btn = card.createEl("button", { cls: "ts-review-write-btn", text: "写入周复盘" });
     btn.addEventListener("click", event => {
@@ -32,17 +32,17 @@ function renderSummary(parent: HTMLElement, model: WeeklyReviewModel, actions: W
     });
   }
   const grid = card.createDiv({ cls: "ts-review-metrics" });
-  metric(grid, `${model.focusItems.filter(item => item.hasProgress).length}/${model.focusItems.length}`, "focus moved");
-  metric(grid, String(model.outcomes.length), "outcomes");
-  metric(grid, String(model.offFocus.count), "off-focus");
-  metric(grid, String(model.risks.open.length), "open risks");
-  metric(grid, String(model.decisions.pending.length), "pending decisions");
+  metric(grid, `${model.focusItems.filter(item => item.hasProgress).length}/${model.focusItems.length}`, "焦点推进");
+  metric(grid, String(model.outcomes.length), "产出");
+  metric(grid, String(model.offFocus.count), "非焦点");
+  metric(grid, String(model.risks.open.length), "开放风险");
+  metric(grid, String(model.decisions.pending.length), "待决策");
 }
 
 function renderFocus(parent: HTMLElement, items: WeeklyReviewFocusItem[]): void {
-  const card = sectionCard(parent, "FOCUS REVIEW", "ts-review-focus-card");
+  const card = sectionCard(parent, "焦点复盘", "ts-review-focus-card");
   if (items.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: "No confirmed weekly Focus" });
+    card.createDiv({ cls: "ts-empty", text: "暂无已确认的本周焦点" });
     return;
   }
   const list = card.createDiv({ cls: "ts-review-list" });
@@ -56,9 +56,9 @@ function renderFocus(parent: HTMLElement, items: WeeklyReviewFocusItem[]): void 
 }
 
 function renderOutcomes(parent: HTMLElement, outcomes: WeeklyReviewOutcome[]): void {
-  const card = sectionCard(parent, "OUTCOMES", "ts-review-outcomes-card");
+  const card = sectionCard(parent, "本周产出", "ts-review-outcomes-card");
   if (outcomes.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: "No weekly outcomes yet" });
+    card.createDiv({ cls: "ts-empty", text: "暂无本周产出" });
     return;
   }
   const list = card.createDiv({ cls: "ts-review-list" });
@@ -72,9 +72,9 @@ function renderOutcomes(parent: HTMLElement, outcomes: WeeklyReviewOutcome[]): v
 }
 
 function renderOffFocus(parent: HTMLElement, model: WeeklyReviewModel): void {
-  const card = sectionCard(parent, "OFF-FOCUS", "ts-review-offfocus-card");
+  const card = sectionCard(parent, "非焦点", "ts-review-offfocus-card");
   if (model.offFocus.events.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: "No off-focus events" });
+    card.createDiv({ cls: "ts-empty", text: "暂无非焦点事件" });
     return;
   }
   const list = card.createDiv({ cls: "ts-review-list" });
@@ -88,21 +88,21 @@ function renderOffFocus(parent: HTMLElement, model: WeeklyReviewModel): void {
 }
 
 function renderRisksAndDecisions(parent: HTMLElement, model: WeeklyReviewModel): void {
-  const card = sectionCard(parent, "RISKS / DECISIONS", "ts-review-risks-card");
+  const card = sectionCard(parent, "风险 / 决策", "ts-review-risks-card");
   const open = card.createDiv({ cls: "ts-review-mini-section" });
-  open.createDiv({ cls: "ts-review-mini-head", text: "Open" });
-  renderTextItems(open, [...model.risks.open, ...model.decisions.pending], "No open risks or decisions");
+  open.createDiv({ cls: "ts-review-mini-head", text: "未关闭" });
+  renderTextItems(open, [...model.risks.open, ...model.decisions.pending], "暂无未关闭风险或待决策");
 
   const closed = card.createDiv({ cls: "ts-review-mini-section" });
-  closed.createDiv({ cls: "ts-review-mini-head", text: "Closed / Made" });
-  renderTextItems(closed, [...model.risks.closed, ...model.decisions.made], "No closed risks or made decisions");
+  closed.createDiv({ cls: "ts-review-mini-head", text: "已关闭 / 已决策" });
+  renderTextItems(closed, [...model.risks.closed, ...model.decisions.made], "暂无已关闭风险或已决策事项");
 }
 
 function renderNextWeek(parent: HTMLElement, model: WeeklyReviewModel): void {
-  const card = sectionCard(parent, "NEXT WEEK", "ts-review-next-card");
+  const card = sectionCard(parent, "下周建议", "ts-review-next-card");
   card.createDiv({ cls: "ts-review-next-summary", text: model.nextWeekProposal.summary });
   if (model.nextWeekProposal.items.length === 0) {
-    card.createDiv({ cls: "ts-empty", text: "No next-week proposal" });
+    card.createDiv({ cls: "ts-empty", text: "暂无下周建议" });
     return;
   }
   const list = card.createDiv({ cls: "ts-review-list" });

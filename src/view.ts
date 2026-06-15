@@ -292,11 +292,11 @@ export class DashboardView extends ItemView {
     titleBlock.createDiv({ cls: "ts-app-title", text: "ThirdSpace" });
     titleBlock.createDiv({ cls: "ts-vault-title", text: (this.app.vault as any).getName?.() ?? "Vault" });
     const pill = hdrL.createDiv({ cls: `ts-pill ${wsIndex ? "ts-pill--ok" : "ts-pill--warn"}` });
-    pill.setText(wsIndex ? `${wsStats.length} workspaces` : "no .thirdspace");
+    pill.setText(wsIndex ? `${wsStats.length} 个工作区` : "缺 .thirdspace");
     if (discovery.pending.length > 0 || discovery.error) {
       const discoveryPill = hdrL.createDiv({
         cls: `ts-pill ${discovery.error ? "ts-pill--warn" : "ts-pill--notice"}`,
-        text: discovery.error ? "project scan issue" : `${discovery.pending.length} project candidates`,
+        text: discovery.error ? "项目扫描异常" : `${discovery.pending.length} 个项目候选`,
       });
       discoveryPill.addEventListener("click", () => this.openFile(PROJECT_DISCOVERY_INBOX_PATH));
     }
@@ -341,23 +341,23 @@ export class DashboardView extends ItemView {
 
     const quickCol = board.createDiv({ cls: "ts-board-col ts-quick-col" });
     const actCard = quickCol.createDiv({ cls: "ts-card ts-compact-card ts-quick-card" });
-    actCard.createDiv({ cls: "ts-card-label", text: "QUICK" });
+    actCard.createDiv({ cls: "ts-card-label", text: "快捷操作" });
     this.renderActions(actCard);
 
     const todayCol = board.createDiv({ cls: "ts-board-col ts-today-col" });
     const logCard = todayCol.createDiv({ cls: "ts-card ts-compact-card ts-today-card" });
     const logHd   = logCard.createDiv({ cls: "ts-card-head" });
-    logHd.createSpan({ cls: "ts-card-label", text: "TODAY" });
+    logHd.createSpan({ cls: "ts-card-label", text: "今日" });
     logHd.createSpan({ cls: "ts-card-meta", text: new Date().toLocaleDateString("zh-CN",{month:"short",day:"numeric",weekday:"short"}) });
     this.renderTodayWorklog(logCard, today, !todayWorklog, focusCoverage, todayExecution);
 
     const todoCol = board.createDiv({ cls: "ts-board-col ts-todo-col" });
     const todoCard = todoCol.createDiv({ cls: "ts-card ts-compact-card ts-todo-card" });
     const tdHd = todoCard.createDiv({ cls: "ts-card-head" });
-    tdHd.createSpan({ cls: "ts-card-label", text: "TODAY'S TODOS" });
+    tdHd.createSpan({ cls: "ts-card-label", text: "今日待办" });
     const todoActions = tdHd.createSpan({ cls: "ts-todo-head-actions" });
     const tdMeta = todoActions.createSpan({ cls: "ts-card-meta ts-todo-meta" });
-    if (pending.length > 0) tdMeta.setText(`${pending.length} pending`);
+    if (pending.length > 0) tdMeta.setText(`${pending.length} 未完成`);
     const copyAll = todoActions.createEl("button", {
       cls: "ts-todo-copy-btn",
       attr: { "aria-label": "复制未完成 Todo", title: "复制未完成 Todo" },
@@ -372,8 +372,8 @@ export class DashboardView extends ItemView {
     const backlogCol = board.createDiv({ cls: "ts-board-col ts-backlog-col" });
     const backlogCard = backlogCol.createDiv({ cls: "ts-card ts-compact-card ts-backlog-card" });
     const bgHd = backlogCard.createDiv({ cls: "ts-card-head" });
-    bgHd.createSpan({ cls: "ts-card-label", text: "PROJECT POOL" });
-    bgHd.createSpan({ cls: "ts-card-meta", text: `${projectBacklog.length} items` });
+    bgHd.createSpan({ cls: "ts-card-label", text: "项目池" });
+    bgHd.createSpan({ cls: "ts-card-meta", text: `${projectBacklog.length} 项` });
     this.renderProjectBacklog(backlogCard, projectBacklog);
   }
 
@@ -476,19 +476,19 @@ export class DashboardView extends ItemView {
 
     const maintenanceGrid = board.createDiv({ cls: "ts-board-col ts-system-grid ts-maintenance-grid" });
     const wsCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-workspaces-card" });
-    wsCard.createDiv({ cls: "ts-card-label", text: "WORKSPACES" });
+    wsCard.createDiv({ cls: "ts-card-label", text: "工作区" });
     this.renderWorkspaces(wsCard, wsStats);
 
     const recCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-recent-card" });
-    recCard.createDiv({ cls: "ts-card-label", text: "RECENT" });
+    recCard.createDiv({ cls: "ts-card-label", text: "最近文件" });
     this.renderRecent(recCard, recent);
 
     const materialsCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-materials-card" });
-    materialsCard.createDiv({ cls: "ts-card-label", text: "MATERIALS" });
+    materialsCard.createDiv({ cls: "ts-card-label", text: "项目资料" });
     this.renderProjectMaterialsCard(materialsCard, materials);
 
     const prodCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-products-card" });
-    prodCard.createDiv({ cls: "ts-card-label", text: "SYSTEM / INBOX" });
+    prodCard.createDiv({ cls: "ts-card-label", text: "系统 / 收件箱" });
     this.renderProducts(prodCard, products, discovery, onboarding);
   }
 
@@ -546,15 +546,15 @@ export class DashboardView extends ItemView {
 
     const head = parent.createDiv({ cls: "ts-card-head ts-activity-head" });
     const title = head.createDiv({ cls: "ts-activity-title" });
-    title.createSpan({ cls: "ts-card-label", text: "ACTIVITY" });
+    title.createSpan({ cls: "ts-card-label", text: "活动概览" });
     title.createSpan({
       cls: "ts-card-meta",
-      text: `90d · ${activeDays90} active · week ${weekCount}${streak > 0 ? ` · ${streak}d streak` : ""}`,
+      text: `近90天 · ${activeDays90} 活跃 · 本周 ${weekCount}${streak > 0 ? ` · 连续 ${streak} 天` : ""}`,
     });
 
     const headMeta = head.createDiv({ cls: "ts-activity-head-metrics" });
-    this.renderActivityMetric(headMeta, "Today", todayCount, "files");
-    this.renderActivityMetric(headMeta, "Top", topProject?.name ?? "—", topProject ? `${topProject.recentCount} files` : "no project");
+    this.renderActivityMetric(headMeta, "今日", todayCount, "文件");
+    this.renderActivityMetric(headMeta, "最多", topProject?.name ?? "—", topProject ? `${topProject.recentCount} 文件` : "无项目");
 
     const body = parent.createDiv({ cls: "ts-activity-body" });
     const vaultPanel = body.createDiv({ cls: "ts-activity-panel ts-activity-panel--vault" });
@@ -609,7 +609,7 @@ export class DashboardView extends ItemView {
     const visible = projects;
     const max = Math.max(...visible.map(p => p.recentCount), 1);
     if (visible.length === 0) {
-      list.createDiv({ cls: "ts-empty", text: "No project activity" });
+      list.createDiv({ cls: "ts-empty", text: "暂无项目活动" });
       return;
     }
     visible.forEach((project, idx) => {
@@ -619,7 +619,7 @@ export class DashboardView extends ItemView {
       });
       const copy = row.createDiv({ cls: "ts-project-activity-copy" });
       copy.createDiv({ cls: "ts-project-activity-name", text: project.name });
-      copy.createDiv({ cls: "ts-project-activity-meta", text: `${project.recentCount} files · ${project.lastModified ? this.relTime(project.lastModified) : "—"}` });
+      copy.createDiv({ cls: "ts-project-activity-meta", text: `${project.recentCount} 文件 · ${project.lastModified ? this.relTime(project.lastModified) : "—"}` });
       const bar = row.createDiv({ cls: "ts-project-activity-bar" });
       bar.createDiv({ cls: "ts-project-activity-fill", attr: { style: `width:${Math.round(project.recentCount / max * 100)}%;--ts-i:${idx}` } });
     });
@@ -628,10 +628,10 @@ export class DashboardView extends ItemView {
   private renderGitActivity(parent: HTMLElement, git: GitActivitySummary) {
     const model = buildGitActivityCardModel(git);
     const summary = parent.createDiv({ cls: "ts-git-summary" });
-    this.renderGitMetric(summary, "90d", model.totalLabel, "commits");
-    this.renderGitMetric(summary, "Today", model.todayLabel, "commits");
-    this.renderGitMetric(summary, "Top", model.topRepoLabel, model.topRepoMeta);
-    this.renderGitMetric(summary, "Latest", model.latestRepoLabel, model.latestRepoMeta);
+    this.renderGitMetric(summary, "近90天", model.totalLabel, "提交");
+    this.renderGitMetric(summary, "今日", model.todayLabel, "提交");
+    this.renderGitMetric(summary, "最多", model.topRepoLabel, model.topRepoMeta);
+    this.renderGitMetric(summary, "最近", model.latestRepoLabel, model.latestRepoMeta);
 
     const chart = parent.createDiv({ cls: "ts-git-trend" });
     const max = Math.max(...git.days.map(d => d.count), 1);
@@ -639,12 +639,12 @@ export class DashboardView extends ItemView {
       const bar = chart.createDiv({ cls: "ts-git-day" });
       const pct = day.count > 0 ? Math.max(8, Math.round(day.count / max * 100)) : 0;
       bar.createDiv({ cls: "ts-git-fill", attr: { style: `height:${pct}%;--ts-i:${idx}` } });
-      bar.setAttr("title", `${day.date}: ${day.count} commits`);
+      bar.setAttr("title", `${day.date}: ${day.count} 次提交`);
     });
 
     const repos = parent.createDiv({ cls: "ts-git-repo-list" });
     if (model.repoRows.length === 0) {
-      repos.createDiv({ cls: "ts-empty", text: "No Git activity" });
+      repos.createDiv({ cls: "ts-empty", text: "暂无 Git 活动" });
       return;
     }
     model.repoRows.forEach((repo, idx) => {
@@ -724,9 +724,9 @@ export class DashboardView extends ItemView {
       const top = card.createDiv({ cls: "ts-ws-top" });
       top.createSpan({ cls: "ts-ws-icon", text: ws.icon });
       top.createSpan({ cls: "ts-ws-name", text: ws.desc });
-      card.createDiv({ cls: "ts-ws-count", text: `${ws.fileCount} files` });
+      card.createDiv({ cls: "ts-ws-count", text: `${ws.fileCount} 文件` });
       card.createDiv({ cls: "ts-ws-bar" }).createDiv({ cls: "ts-ws-fill", attr: { style: `width:${Math.round(ws.fileCount/maxFiles*100)}%` } });
-      card.createDiv({ cls: "ts-ws-time", text: ws.lastModified ? `active ${this.relTime(ws.lastModified)}` : "—" });
+      card.createDiv({ cls: "ts-ws-time", text: ws.lastModified ? `活跃 ${this.relTime(ws.lastModified)}` : "—" });
     }
   }
 
@@ -745,7 +745,7 @@ export class DashboardView extends ItemView {
       todayLogPath: getTodayWorklogPath(),
     });
     const head = parent.createDiv({ cls: "ts-next-action-head" });
-    head.createDiv({ cls: "ts-card-label", text: "NEXT ACTION" });
+    head.createDiv({ cls: "ts-card-label", text: "下一步行动" });
     head.createDiv({ cls: `ts-next-action-badge ts-next-action-badge--${action.tone}`, text: action.badge });
 
     const body = parent.createDiv({ cls: "ts-next-action-body" });
@@ -789,7 +789,7 @@ export class DashboardView extends ItemView {
   // ── Project backlog (from per-project 未完成事项.md)
   private renderProjectBacklog(parent: HTMLElement, items: ProjectBacklogItem[]) {
     if (items.length === 0) {
-      parent.createDiv({ cls: "ts-empty", text: "No project backlog" });
+      parent.createDiv({ cls: "ts-empty", text: "暂无项目池事项" });
       return;
     }
     const list = parent.createDiv({ cls: "ts-backlog-list" });
@@ -821,7 +821,7 @@ export class DashboardView extends ItemView {
     const done    = items.filter(t => t.done);
 
     if (items.length === 0) {
-      parent.createDiv({ cls: "ts-empty", text: 'No todos — click "记TODO" to add' });
+      parent.createDiv({ cls: "ts-empty", text: "暂无 Todo，点击“记TODO”添加" });
       return;
     }
     const list = parent.createDiv({ cls: "ts-todo-list" });
@@ -861,7 +861,7 @@ export class DashboardView extends ItemView {
     const row = parent.createDiv({ cls: `ts-todo-row${item.done ? " ts-todo-done" : ""}` });
     const chk = row.createEl("button", {
       cls: "ts-todo-chk",
-      attr: { "aria-label": item.done ? "Mark todo incomplete" : "Mark todo complete" },
+      attr: { "aria-label": item.done ? "标记为未完成" : "标记为完成" },
     });
     setIcon(chk, item.done ? "check-square" : "square");
     const content = row.createDiv({ cls: "ts-todo-content" });
@@ -969,7 +969,7 @@ export class DashboardView extends ItemView {
       init.createSpan({ cls: "ts-today-init-sub", text: getTodayWorklogPath() });
       init.addEventListener("click", openToday);
     } else if (today.highlights.length === 0) {
-      focusBody.createDiv({ cls: "ts-empty ts-today-empty", text: "No highlights" });
+      focusBody.createDiv({ cls: "ts-empty ts-today-empty", text: "暂无今日重点" });
     } else {
       const hl = focusBody.createDiv({ cls: "ts-log-highlights" });
       for (const h of today.highlights) {
@@ -1002,9 +1002,9 @@ export class DashboardView extends ItemView {
       const list = flowBody.createDiv({ cls: "ts-timeline-list" });
       for (const item of visibleTimeline) this.renderTimelineItem(list, item);
     } else if (today.timeline.length > 0) {
-      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: "No items for this filter" });
+      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: "当前筛选暂无内容" });
     } else {
-      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示记录/产出" : "No records" });
+      flowBody.createDiv({ cls: "ts-empty ts-today-empty", text: missingLog ? "今日日志创建后显示记录/产出" : "暂无记录" });
     }
   }
 
@@ -1056,7 +1056,7 @@ export class DashboardView extends ItemView {
   private renderTodayFocusCoverage(parent: HTMLElement, coverage: TodayFocusCoverage) {
     const wrap = parent.createDiv({ cls: "ts-focus-coverage" });
     const head = wrap.createDiv({ cls: "ts-focus-coverage-head" });
-    head.createSpan({ cls: "ts-focus-coverage-title", text: "FOCUS PROJECTS" });
+    head.createSpan({ cls: "ts-focus-coverage-title", text: "本周焦点" });
     head.createSpan({
       cls: "ts-focus-coverage-count",
       text: coverage.totalFocus > 0 ? `${coverage.coveredCount}/${coverage.totalFocus}` : coverage.confirmationStatus,
@@ -1065,7 +1065,7 @@ export class DashboardView extends ItemView {
     if (coverage.totalFocus === 0) {
       wrap.createDiv({
         cls: "ts-empty ts-focus-coverage-empty",
-        text: coverage.confirmationStatus === "confirmed" ? "No weekly Focus set" : "Weekly Focus pending confirmation",
+        text: coverage.confirmationStatus === "confirmed" ? "暂无本周焦点" : "本周焦点待确认",
       });
       return;
     }
@@ -1077,12 +1077,12 @@ export class DashboardView extends ItemView {
       });
       row.createSpan({ cls: "ts-focus-coverage-role", text: this.focusRoleLabel(project.role) });
       row.createSpan({ cls: "ts-focus-coverage-name", text: project.name });
-      row.createSpan({ cls: "ts-focus-coverage-state", text: project.covered ? "covered" : "missing" });
+      row.createSpan({ cls: "ts-focus-coverage-state", text: project.covered ? "已覆盖" : "缺失" });
     }
 
     if (coverage.offFocusProjects.length === 0) return;
     const offFocus = wrap.createDiv({ cls: "ts-off-focus-row" });
-    offFocus.createSpan({ cls: "ts-off-focus-label", text: "OFF-FOCUS" });
+    offFocus.createSpan({ cls: "ts-off-focus-label", text: "非焦点" });
     const chips = offFocus.createSpan({ cls: "ts-off-focus-chips" });
     for (const project of coverage.offFocusProjects) chips.createSpan({ cls: "ts-off-focus-chip", text: project });
   }
@@ -1400,7 +1400,7 @@ export class DashboardView extends ItemView {
   ) {
     const onboardingPending = onboarding.filter(item => item.needsOnboarding);
     if (products.length === 0 && discovery.pending.length === 0 && onboardingPending.length === 0 && !discovery.error) {
-      parent.createDiv({ cls: "ts-empty", text: "No product status" });
+      parent.createDiv({ cls: "ts-empty", text: "暂无系统或收件箱状态" });
       return;
     }
 
@@ -1415,7 +1415,7 @@ export class DashboardView extends ItemView {
         info.createDiv({ cls: "ts-prod-name", text: p.name });
         if (p.milestone) info.createDiv({ cls: "ts-prod-mile", text: p.milestone });
       }
-      if (products.length > visible.length) list.createDiv({ cls: "ts-inline-more", text: `+ ${products.length - visible.length} more products` });
+      if (products.length > visible.length) list.createDiv({ cls: "ts-inline-more", text: `+ ${products.length - visible.length} 个产品` });
     }
 
     this.renderProjectDiscovery(parent, discovery, onboardingPending);
@@ -1424,7 +1424,7 @@ export class DashboardView extends ItemView {
   private renderProjectDiscovery(parent: HTMLElement, discovery: ProjectDiscoverySummary, onboarding: ProjectOnboardingItem[]) {
     if (discovery.error) {
       const warn = parent.createDiv({ cls: "ts-discovery-box ts-discovery-box--warn" });
-      warn.createDiv({ cls: "ts-discovery-kicker", text: "SYSTEM / INBOX" });
+      warn.createDiv({ cls: "ts-discovery-kicker", text: "系统 / 收件箱" });
       warn.createDiv({ cls: "ts-discovery-title", text: "项目发现扫描异常" });
       warn.createDiv({ cls: "ts-discovery-path", text: discovery.error });
       return;
@@ -1433,7 +1433,7 @@ export class DashboardView extends ItemView {
       const box = parent.createDiv({ cls: "ts-discovery-box" });
       const head = box.createDiv({ cls: "ts-discovery-head" });
       const copy = head.createDiv({ cls: "ts-discovery-copy" });
-      copy.createDiv({ cls: "ts-discovery-kicker", text: "SYSTEM / INBOX" });
+      copy.createDiv({ cls: "ts-discovery-kicker", text: "系统 / 收件箱" });
       copy.createDiv({ cls: "ts-discovery-title", text: `${discovery.pending.length} 个新项目待确认` });
       const openBtn = head.createEl("button", { cls: "ts-discovery-open", text: "打开确认单" });
       openBtn.addEventListener("click", () => this.openFile(discovery.notePath));
@@ -1441,7 +1441,7 @@ export class DashboardView extends ItemView {
       const list = box.createDiv({ cls: "ts-discovery-list" });
       for (const candidate of discovery.pending.slice(0, 3)) this.renderCandidateRow(list, candidate);
       if (discovery.pending.length > 3) {
-        const more = list.createDiv({ cls: "ts-inline-more", text: `+ ${discovery.pending.length - 3} more candidates` });
+        const more = list.createDiv({ cls: "ts-inline-more", text: `+ ${discovery.pending.length - 3} 个候选` });
         more.addEventListener("click", () => this.openFile(discovery.notePath));
       }
     }
@@ -1478,7 +1478,7 @@ export class DashboardView extends ItemView {
     const box = parent.createDiv({ cls: "ts-discovery-box ts-discovery-box--onboarding" });
     const head = box.createDiv({ cls: "ts-discovery-head" });
     const copy = head.createDiv({ cls: "ts-discovery-copy" });
-    copy.createDiv({ cls: "ts-discovery-kicker", text: "PROJECT ONBOARDING" });
+    copy.createDiv({ cls: "ts-discovery-kicker", text: "项目接入" });
     copy.createDiv({ cls: "ts-discovery-title", text: `${onboarding.length} 个项目待接入` });
 
     const list = box.createDiv({ cls: "ts-discovery-list" });
@@ -1504,26 +1504,26 @@ export class DashboardView extends ItemView {
         });
       });
     }
-    if (onboarding.length > 4) list.createDiv({ cls: "ts-inline-more", text: `+ ${onboarding.length - 4} more onboarding items` });
+    if (onboarding.length > 4) list.createDiv({ cls: "ts-inline-more", text: `+ ${onboarding.length - 4} 个接入项` });
   }
 
   private renderProjectMaterialsCard(parent: HTMLElement, materials: ProjectMaterialsItem[]) {
     if (materials.length === 0) {
-      parent.createDiv({ cls: "ts-empty", text: "No project materials" });
+      parent.createDiv({ cls: "ts-empty", text: "暂无项目资料" });
       return;
     }
 
     const pending = materials.filter(item => item.needsImport);
     const synced = materials.length - pending.length;
     const summary = parent.createDiv({ cls: "ts-material-summary" });
-    summary.createDiv({ cls: `ts-material-pill ${pending.length > 0 ? "ts-material-pill--warn" : "ts-material-pill--ok"}`, text: `${synced}真实/${materials.length}总数 indexed` });
-    summary.createDiv({ cls: "ts-material-pill", text: pending.length > 0 ? `${pending.length} pending` : "index-only" });
+    summary.createDiv({ cls: `ts-material-pill ${pending.length > 0 ? "ts-material-pill--warn" : "ts-material-pill--ok"}`, text: `${synced}真实/${materials.length}总数 已索引` });
+    summary.createDiv({ cls: "ts-material-pill", text: pending.length > 0 ? `${pending.length} 待导入` : "仅索引" });
 
     const list = parent.createDiv({ cls: "ts-material-list" });
     const visible = materials.slice(0, this.singleScreenLimit.materials);
     for (const item of visible) this.renderProjectMaterialRow(list, item);
     if (materials.length > visible.length) {
-      list.createDiv({ cls: "ts-inline-more", text: `+ ${materials.length - visible.length} more material projects` });
+      list.createDiv({ cls: "ts-inline-more", text: `+ ${materials.length - visible.length} 个资料项目` });
     }
   }
 
@@ -1551,7 +1551,7 @@ export class DashboardView extends ItemView {
         importBtn.setText(item.needsImport ? "索引中" : "重扫中");
         const result = await runProjectMaterialsImport(this.app, item.id);
         if (result) {
-          new Notice(`${item.name} 资料索引完成：${result.indexedCount} files，快照 0`);
+          new Notice(`${item.name} 资料索引完成：${result.indexedCount} 文件，快照 0`);
         } else {
           new Notice(`未找到资料索引项目：${item.name}`);
         }
@@ -1606,9 +1606,9 @@ export class DashboardView extends ItemView {
   }
   private relTime(ms: number): string {
     const d = Math.floor((Date.now()-ms)/86_400_000);
-    if (d===0) return "today"; if (d===1) return "1d";
-    if (d<7) return `${d}d`; if (d<30) return `${Math.floor(d/7)}w`;
-    return `${Math.floor(d/30)}mo`;
+    if (d===0) return "今天"; if (d===1) return "1天";
+    if (d<7) return `${d}天`; if (d<30) return `${Math.floor(d/7)}周`;
+    return `${Math.floor(d/30)}个月`;
   }
   private async openFile(path: string) {
     const f = this.app.vault.getAbstractFileByPath(path) as TFile|null;
