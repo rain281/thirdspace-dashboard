@@ -65,6 +65,7 @@ import { renderPortfolio } from "./components/portfolio";
 import { renderProjectDetailPage } from "./components/project-detail";
 import { renderSystemHealth } from "./components/system-health";
 import { renderTodayExecution } from "./components/today-execution";
+import { renderTodayFocusStrip } from "./components/today-focus-strip";
 import { renderWeeklyReview } from "./components/weekly-review";
 import { renderWritePreviewModalContent } from "./components/write-preview-modal";
 import { renderSnakeHeatmap, type SnakeRouteCache } from "./components/snake-heatmap";
@@ -1050,47 +1051,7 @@ export class DashboardView extends ItemView {
       focus.createDiv({ cls: "ts-today-focus-text", text: metrics.total > 0 ? "今日 Todo 已完成" : "暂无今日 Todo" });
     }
 
-    if (focusCoverage) this.renderTodayFocusCoverage(body, focusCoverage);
-  }
-
-  private renderTodayFocusCoverage(parent: HTMLElement, coverage: TodayFocusCoverage) {
-    const wrap = parent.createDiv({ cls: "ts-focus-coverage" });
-    const head = wrap.createDiv({ cls: "ts-focus-coverage-head" });
-    head.createSpan({ cls: "ts-focus-coverage-title", text: "本周焦点" });
-    head.createSpan({
-      cls: "ts-focus-coverage-count",
-      text: coverage.totalFocus > 0 ? `${coverage.coveredCount}/${coverage.totalFocus}` : coverage.confirmationStatus,
-    });
-
-    if (coverage.totalFocus === 0) {
-      wrap.createDiv({
-        cls: "ts-empty ts-focus-coverage-empty",
-        text: coverage.confirmationStatus === "confirmed" ? "暂无本周焦点" : "本周焦点待确认",
-      });
-      return;
-    }
-
-    const list = wrap.createDiv({ cls: "ts-focus-coverage-list" });
-    for (const project of coverage.focusProjects) {
-      const row = list.createDiv({
-        cls: `ts-focus-coverage-row ${project.covered ? "is-covered" : "is-missing"}`,
-      });
-      row.createSpan({ cls: "ts-focus-coverage-role", text: this.focusRoleLabel(project.role) });
-      row.createSpan({ cls: "ts-focus-coverage-name", text: project.name });
-      row.createSpan({ cls: "ts-focus-coverage-state", text: project.covered ? "已覆盖" : "缺失" });
-    }
-
-    if (coverage.offFocusProjects.length === 0) return;
-    const offFocus = wrap.createDiv({ cls: "ts-off-focus-row" });
-    offFocus.createSpan({ cls: "ts-off-focus-label", text: "非焦点" });
-    const chips = offFocus.createSpan({ cls: "ts-off-focus-chips" });
-    for (const project of coverage.offFocusProjects) chips.createSpan({ cls: "ts-off-focus-chip", text: project });
-  }
-
-  private focusRoleLabel(role: "main" | "support" | "maintenance"): string {
-    if (role === "main") return "主";
-    if (role === "support") return "副";
-    return "维";
+    if (focusCoverage) renderTodayFocusStrip(body, focusCoverage);
   }
 
   private calculateTodayMetrics(today: TodayWorklog): TodayMetrics {

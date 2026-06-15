@@ -5,6 +5,7 @@ import "./weekly-review.test";
 import "./weekly-review-renderer.test";
 import "./today-execution.test";
 import "./today-execution-renderer.test";
+import "./today-focus-strip-renderer.test";
 import "./controlled-write.test";
 import "./write-preview-modal.test";
 import "./project-discovery.test";

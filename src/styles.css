@@ -2518,24 +2518,25 @@
 .ts-today-metrics-body {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  overflow-y: hidden;
 }
 
 .ts-today-metric-grid {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
 }
 
 .ts-today-metric {
   min-width: 0;
-  min-height: 34px;
+  min-height: 28px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 5px;
+  gap: 1px;
+  padding: 3px 4px;
   border: 1px solid var(--ts-border);
   border-radius: var(--ts-radius-sm);
   background: color-mix(in srgb, var(--background-primary) 84%, var(--ts-panel) 16%);
@@ -2565,7 +2566,7 @@
   overflow: hidden;
   color: var(--ts-text);
   font-family: var(--ts-mono);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 850;
   text-align: center;
@@ -2577,7 +2578,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ts-text-3);
-  font-size: 8.2px;
+  font-size: 7.8px;
   line-height: 1.1;
   font-weight: 750;
   text-align: center;
@@ -2587,10 +2588,12 @@
 
 .ts-today-focus {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 5px 6px;
+  min-height: 26px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
   border: 1px solid color-mix(in srgb, var(--ts-accent) 16%, var(--ts-border) 84%);
   border-radius: var(--ts-radius-sm);
   background: color-mix(in srgb, var(--ts-accent) 6%, var(--background-primary) 94%);
@@ -2603,19 +2606,80 @@
 }
 
 .ts-today-focus-label {
+  flex: 0 0 auto;
   color: var(--ts-text-3);
   font-size: 8.5px;
   line-height: 1.05;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .ts-today-focus-text {
   min-width: 0;
+  overflow: hidden;
   color: var(--ts-text);
   font-size: 10.5px;
-  line-height: 1.2;
+  line-height: 1.1;
   font-weight: 650;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-today-focus-strip {
+  min-width: 0;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--ts-accent) 16%, var(--ts-border) 84%);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--ts-accent) 4%, var(--background-primary) 96%);
+}
+
+.ts-today-focus-strip.has-off-focus {
+  border-color: color-mix(in srgb, var(--ts-yellow) 30%, var(--ts-border) 70%);
+  background: color-mix(in srgb, var(--ts-yellow) 5%, var(--background-primary) 95%);
+}
+
+.ts-today-focus-strip-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.ts-today-focus-strip-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text-3);
+  font-size: 8.5px;
+  line-height: 1.05;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ts-today-focus-strip-count {
+  flex: 0 0 auto;
+  color: var(--ts-text);
+  font-family: var(--ts-mono);
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.ts-today-focus-strip-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ts-text);
+  font-size: 10.2px;
+  line-height: 1.1;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ts-focus-coverage {
