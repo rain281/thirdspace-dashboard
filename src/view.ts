@@ -36,10 +36,13 @@ import {
   deriveTodayFocusCoverage,
   createFocusConfirmationPreviews,
   createProjectDetailActionPreview,
+  createProjectDecisionResolutionPreview,
+  createProjectRiskResolutionPreview,
   deriveWriteConsistencyIssues,
   focusWeeklyPlanPath,
   FOCUS_WEEK_PATH,
   nextIsoWeek,
+  projectDetailActionMode,
   selectTodayNextAction,
   type PortfolioModel,
   type ProjectDetailAction,
@@ -54,6 +57,8 @@ import {
   createMaterialsOperationPreview,
   createNewNoteOperationPreview,
   createOnboardingOperationPreview,
+  createProjectDetailTodayOperationPreview,
+  projectDetailTodayTodoText,
   createPromoteBacklogOperationPreview,
   createTodayWorklogOperationPreview,
   createTodoAddOperationPreview,
@@ -401,8 +406,8 @@ export class DashboardView extends ItemView {
         },
         openFile: path => this.openFile(path),
         openWorkspace: path => this.openWorkspace(path),
-        projectDetailAction: (projectId, action) => {
-          void this.openProjectDetailActionModal(portfolio, projectId, action);
+        projectDetailAction: (projectId, action, itemText) => {
+          void this.openProjectDetailActionModal(portfolio, projectId, action, itemText);
         },
       });
       return;
@@ -1694,10 +1699,30 @@ export class DashboardView extends ItemView {
     portfolio: PortfolioModel,
     projectId: string,
     action: ProjectDetailAction,
+    itemText?: string,
   ) {
     const project = portfolio.projects.find(item => item.id === projectId);
     if (!project || !project.statusNote || project.lifecycle === "archived") {
       new Notice("项目状态笔记不可写");
+      return;
+    }
+    if (projectDetailActionMode(action) === "direct-preview") {
+      if (!itemText?.trim()) {
+        new Notice("缺少项目状态条目");
+        return;
+      }
+      if (action === "add-today") {
+        this.confirmAndRunOperation(createProjectDetailTodayOperationPreview(project.name, itemText), async () => {
+          await addTodoToWorklog(this.app, projectDetailTodayTodoText(project.name, itemText));
+          new Notice("已加入今日工作日志");
+        });
+        return;
+      }
+      const existingContent = await this.app.vault.adapter.read(project.statusNote).catch(() => "");
+      const preview = action === "resolve-risk"
+        ? createProjectRiskResolutionPreview({ project, text: itemText, existingContent })
+        : createProjectDecisionResolutionPreview({ project, text: itemText, existingContent });
+      this.confirmAndApplyWrite(preview);
       return;
     }
     new TextInputModal(this.app, projectDetailActionTitle(project.name, action), projectDetailActionPlaceholder(action), async text => {

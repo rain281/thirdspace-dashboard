@@ -9,6 +9,7 @@ import {
   deriveManagedProjects,
   derivePortfolioSummary,
   deriveTodayFocusCoverage,
+  projectDetailActionMode,
   parseFocusWeekYaml,
   parseProjectStatusMarkdown,
   STANDARD_PROJECT_STATUS_SECTIONS,
@@ -224,6 +225,13 @@ const riskPreview = createProjectDetailActionPreview({
 assert.equal(riskPreview.title, "新增 Pilot 风险");
 assert.match(riskPreview.after, /## 风险与阻塞/);
 assert.match(riskPreview.writeContent, /Mail\.app 权限仍未确认。/);
+
+assert.equal(projectDetailActionMode("next-step"), "text-input");
+assert.equal(projectDetailActionMode("risk"), "text-input");
+assert.equal(projectDetailActionMode("decision"), "text-input");
+assert.equal(projectDetailActionMode("add-today"), "direct-preview");
+assert.equal(projectDetailActionMode("resolve-risk"), "direct-preview");
+assert.equal(projectDetailActionMode("resolve-decision"), "direct-preview");
 
 const resolvedRiskPreview = createProjectRiskResolutionPreview({
   project: {

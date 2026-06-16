@@ -67,7 +67,7 @@ export function createPromoteBacklogOperationPreview(item: ProjectBacklogItem): 
 }
 
 export function createProjectDetailTodayOperationPreview(projectName: string, itemText: string): ControlledWritePreview {
-  const text = todayTodoTextFromProject(projectName, itemText);
+  const text = projectDetailTodayTodoText(projectName, itemText);
   return createOperationPreview({
     path: getTodayWorklogPath(),
     title: "从项目详情加入今日",
@@ -100,7 +100,7 @@ export function createNewNoteOperationPreview(path: string, content: string): Co
   });
 }
 
-function todayTodoTextFromProject(projectName: string, itemText: string): string {
+export function projectDetailTodayTodoText(projectName: string, itemText: string): string {
   const project = projectName.trim();
   const text = itemText.trim();
   if (!project) return text;

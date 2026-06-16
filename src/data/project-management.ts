@@ -216,6 +216,11 @@ export interface ProjectDetailResolutionPreviewInput {
   now?: Date;
 }
 
+export function projectDetailActionMode(action: ProjectDetailAction): "text-input" | "direct-preview" {
+  if (action === "next-step" || action === "risk" || action === "decision") return "text-input";
+  return "direct-preview";
+}
+
 export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek {
   if (!content.trim()) return emptyFocusWeek(now);
   const lines = content.split("\n");

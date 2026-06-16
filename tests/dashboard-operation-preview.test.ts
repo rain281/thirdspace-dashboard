@@ -5,6 +5,7 @@ import {
   createNewNoteOperationPreview,
   createOnboardingOperationPreview,
   createProjectDetailTodayOperationPreview,
+  projectDetailTodayTodoText,
   createPromoteBacklogOperationPreview,
   createTodayWorklogOperationPreview,
   createTodoAddOperationPreview,
@@ -44,6 +45,9 @@ assert.match(projectDetailTodayPreview.path, /02-日记\/工作日志\/\d{8}_工
 assert.match(projectDetailTodayPreview.writeContent, /项目：Kora/);
 assert.match(projectDetailTodayPreview.writeContent, /写入内容：- \[ \] Kora：完成只读 Portfolio/);
 assert.match(projectDetailTodayPreview.warnings.join(" "), /不会修改项目状态笔记/);
+assert.equal(projectDetailTodayTodoText("Kora", "完成只读 Portfolio"), "Kora：完成只读 Portfolio");
+assert.equal(projectDetailTodayTodoText("Kora", "Kora：完成只读 Portfolio"), "Kora：完成只读 Portfolio");
+assert.equal(projectDetailTodayTodoText("Kora", "Kora: 完成只读 Portfolio"), "Kora: 完成只读 Portfolio");
 
 const newNotePreview = createNewNoteOperationPreview("01-收件箱/20260612_untitled.md", "---\ntitle: Untitled\n---\n");
 assert.equal(newNotePreview.title, "创建新笔记");

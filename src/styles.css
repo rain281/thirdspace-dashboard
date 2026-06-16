@@ -1260,6 +1260,14 @@
   white-space: normal;
 }
 
+.ts-detail-summary-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+}
+
 .ts-detail-summary-item {
   position: relative;
   padding-left: 11px;
@@ -1286,6 +1294,39 @@
 
 .ts-detail-summary-item--done::before {
   background: color-mix(in srgb, var(--ts-green) 78%, var(--ts-text) 22%);
+}
+
+.ts-detail-inline-action {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 72px;
+  min-height: 18px;
+  overflow: hidden;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--ts-accent) 22%, var(--ts-border) 78%);
+  border-radius: var(--ts-radius-sm);
+  background: color-mix(in srgb, var(--background-secondary) 88%, var(--ts-panel) 12%);
+  color: var(--ts-text-2);
+  font-size: 8.5px;
+  font-weight: 760;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ts-detail-inline-action:hover {
+  border-color: var(--ts-accent-2);
+  color: var(--ts-text);
+  background: color-mix(in srgb, var(--ts-accent-2) 14%, transparent 86%);
+}
+
+.ts-detail-inline-action--resolve-risk {
+  border-color: color-mix(in srgb, var(--ts-green) 26%, var(--ts-border) 74%);
+}
+
+.ts-detail-inline-action--resolve-decision {
+  border-color: color-mix(in srgb, var(--ts-yellow) 30%, var(--ts-border) 70%);
 }
 
 .ts-detail-section--next .ts-detail-section-text,
