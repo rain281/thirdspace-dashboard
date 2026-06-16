@@ -4,7 +4,7 @@ export interface ProjectDetailActions {
   backToPortfolio(): void;
   openFile(path: string): void;
   openWorkspace?(path: string): void;
-  projectDetailAction?(projectId: string, action: ProjectDetailAction): void;
+  projectDetailAction?(projectId: string, action: ProjectDetailAction, itemText?: string): void;
 }
 
 export function renderProjectDetailPage(
@@ -47,12 +47,12 @@ export function renderProjectDetailPage(
   detailSection(main, "目标", project.goal, "goal", 2);
   detailSection(main, "成功标准", project.successCriteria, "success", 3);
   detailSection(main, "里程碑", project.milestone, "milestone", 2);
-  detailSection(main, "下一步", project.nextStep, "next", 3);
+  detailSection(main, "下一步", project.nextStep, "next", 3, project, actions, "add-today");
 
   const riskPanel = grid.createDiv({ cls: "ts-detail-panel ts-detail-risk-panel" });
   riskPanel.createDiv({ cls: "ts-detail-panel-label", text: "风险判断" });
-  detailSection(riskPanel, "风险", project.risks, "risks", 3);
-  detailSection(riskPanel, "待决策", project.pendingDecisions, "decisions", 3);
+  detailSection(riskPanel, "风险", project.risks, "risks", 3, project, actions, "resolve-risk");
+  detailSection(riskPanel, "待决策", project.pendingDecisions, "decisions", 3, project, actions, "resolve-decision");
   detailSection(riskPanel, "交付门禁", project.deliveryGates, "gates", 3);
 
   const contextPanel = grid.createDiv({ cls: "ts-detail-panel ts-detail-context-panel" });
@@ -64,16 +64,29 @@ export function renderProjectDetailPage(
   renderProjectDetailActions(grid, project, actions);
 }
 
-function detailSection(parent: HTMLElement, label: string, markdown: string, key: string, limit: number): void {
+function detailSection(
+  parent: HTMLElement,
+  label: string,
+  markdown: string,
+  key: string,
+  limit: number,
+  project?: ManagedProject,
+  actions?: ProjectDetailActions,
+  inlineAction?: ProjectDetailAction,
+): void {
   const section = parent.createDiv({ cls: `ts-detail-section ts-detail-section--${key}` });
   section.createDiv({ cls: "ts-detail-section-label", text: label });
   const items = summarize(markdown, limit);
   const list = section.createDiv({ cls: "ts-detail-summary-list" });
   for (const item of items) {
-    list.createDiv({
+    const row = list.createDiv({
+      cls: `ts-detail-summary-row ts-detail-summary-row--${item.state}`,
+    });
+    row.createDiv({
       cls: `ts-detail-section-text ts-detail-summary-item ts-detail-summary-item--${item.state}`,
       text: item.text,
     });
+    renderInlineAction(row, item, project, actions, inlineAction);
   }
 }
 
@@ -108,6 +121,27 @@ function detailAction(
   btn.addEventListener("click", event => {
     event?.stopPropagation?.();
     actions.projectDetailAction?.(project.id, action);
+  });
+}
+
+function renderInlineAction(
+  parent: HTMLElement,
+  item: SummaryItem,
+  project?: ManagedProject,
+  actions?: ProjectDetailActions,
+  action?: ProjectDetailAction,
+): void {
+  if (!project || !actions?.projectDetailAction || !action) return;
+  if (project.lifecycle === "archived" || !project.statusNote) return;
+  if (item.state !== "pending") return;
+  const btn = parent.createEl("button", {
+    cls: `ts-detail-inline-action ts-detail-inline-action--${action}`,
+    text: inlineActionLabel(action),
+    attr: { title: inlineActionTitle(action, item.text) },
+  });
+  btn.addEventListener("click", event => {
+    event?.stopPropagation?.();
+    actions.projectDetailAction?.(project.id, action, item.text);
   });
 }
 
@@ -183,6 +217,20 @@ function toSummaryItem(line: string): SummaryItem | null {
     text: trimmed.replace(/^\s*[-*]\s+/, "").trim(),
     state: "plain",
   };
+}
+
+function inlineActionLabel(action: ProjectDetailAction): string {
+  if (action === "add-today") return "加入今日";
+  if (action === "resolve-risk") return "解除";
+  if (action === "resolve-decision") return "已决策";
+  return "操作";
+}
+
+function inlineActionTitle(action: ProjectDetailAction, text: string): string {
+  if (action === "add-today") return `加入今日 Todo：${text}`;
+  if (action === "resolve-risk") return `标记风险解除：${text}`;
+  if (action === "resolve-decision") return `标记待决策为已决策：${text}`;
+  return text;
 }
 
 function healthClass(status: ProjectHealthStatus): string {

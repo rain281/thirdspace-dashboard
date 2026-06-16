@@ -118,7 +118,7 @@ renderProjectDetailPage(parent as unknown as HTMLElement, project, {
   backToPortfolio: () => { backCount += 1; },
   openFile: path => opened.push(path),
   openWorkspace: path => workspaces.push(path),
-  projectDetailAction: (projectId, action) => actions.push(`${projectId}:${action}`),
+  projectDetailAction: (projectId, action, itemText) => actions.push([projectId, action, itemText].filter(Boolean).join(":")),
 });
 
 const text = parent.textContent();
@@ -225,7 +225,27 @@ assert.match(repoRow?.getAttr("title") ?? "", /只读路径/);
 parent.findByClass("ts-detail-action--next-step")?.click();
 parent.findByClass("ts-detail-action--risk")?.click();
 parent.findByClass("ts-detail-action--decision")?.click();
-assert.deepEqual(actions, ["kora:next-step", "kora:risk", "kora:decision"]);
+parent.findByClass("ts-detail-inline-action--add-today")?.click();
+parent.findByClass("ts-detail-inline-action--resolve-risk")?.click();
+parent.findByClass("ts-detail-inline-action--resolve-decision")?.click();
+assert.deepEqual(actions, [
+  "kora:next-step",
+  "kora:risk",
+  "kora:decision",
+  "kora:add-today:完成只读 Portfolio",
+  "kora:resolve-risk:发布门禁未关闭",
+  "kora:resolve-decision:确认首屏密度",
+]);
+
+const archivedParent = new FakeElement();
+renderProjectDetailPage(archivedParent as unknown as HTMLElement, { ...project, lifecycle: "archived" }, {
+  backToPortfolio: () => undefined,
+  openFile: () => undefined,
+  projectDetailAction: (projectId, action, itemText) => actions.push([projectId, action, itemText].filter(Boolean).join(":")),
+});
+assert.equal(archivedParent.findByClass("ts-detail-inline-action--add-today"), null);
+assert.equal(archivedParent.findByClass("ts-detail-inline-action--resolve-risk"), null);
+assert.equal(archivedParent.findByClass("ts-detail-inline-action--resolve-decision"), null);
 
 const missingLinkParent = new FakeElement();
 renderProjectDetailPage(missingLinkParent as unknown as HTMLElement, { ...project, codexContext: "" }, {

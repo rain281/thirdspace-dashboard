@@ -194,7 +194,13 @@ export interface WriteConsistencyInput {
   weeklyPlanContent: string;
 }
 
-export type ProjectDetailAction = "next-step" | "risk" | "decision";
+export type ProjectDetailAction =
+  | "next-step"
+  | "risk"
+  | "decision"
+  | "add-today"
+  | "resolve-risk"
+  | "resolve-decision";
 
 export interface ProjectDetailActionPreviewInput {
   project: Pick<ManagedProject, "id" | "name" | "lifecycle" | "statusNote">;
