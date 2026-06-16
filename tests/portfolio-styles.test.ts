@@ -29,6 +29,8 @@ assert.match(styles, /\.ts-review-write-btn\s*\{[\s\S]*width:\s*auto/);
 assert.match(styles, /\.ts-review-metrics\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(72px,\s*1fr\)\)/);
 assert.match(styles, /\.ts-review-focus-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
 assert.match(styles, /\.ts-review-focus-cardlet\s*\{/);
+assert.match(styles, /\.ts-system-health-issue-action\s*\{[\s\S]*height:\s*20px/);
+assert.match(styles, /\.ts-system-health-issue-action:hover\s*\{/);
 assert.match(styles, /\.ts-board--projects-detail/);
 assert.match(styles, /\.ts-project-detail-page/);
 assert.match(styles, /\.ts-detail-back-btn/);

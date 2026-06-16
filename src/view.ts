@@ -482,6 +482,10 @@ export class DashboardView extends ItemView {
       workspaceCount: wsStats.length,
       gitRepoCount: gitActivity.repos.length,
       writeConsistencyIssues: deriveWriteConsistencyIssues({ portfolio, weeklyPlanContent }),
+    }, {
+      onIssueAction: issue => {
+        void this.handleSystemHealthIssueAction(issue, portfolio, weeklyPlanContent);
+      },
     });
 
     const activityCol = board.createDiv({ cls: "ts-board-col ts-system-activity-col" });
@@ -505,6 +509,42 @@ export class DashboardView extends ItemView {
     const prodCard = maintenanceGrid.createDiv({ cls: "ts-card ts-compact-card ts-products-card" });
     prodCard.createDiv({ cls: "ts-card-label", text: "系统 / 收件箱" });
     this.renderProducts(prodCard, products, discovery, onboarding);
+  }
+
+  private async handleSystemHealthIssueAction(
+    issue: { action?: { kind: "confirm-weekly-focus" | "write-weekly-review" | "open-projects"; week?: string } },
+    portfolio: PortfolioModel,
+    weeklyPlanContent: string,
+  ) {
+    if (!issue.action) return;
+    if (issue.action.kind === "open-projects") {
+      this.activePage = "projects";
+      this.projectsViewMode = "portfolio";
+      this.selectedProjectId = null;
+      await this.render();
+      return;
+    }
+
+    if (issue.action.kind === "confirm-weekly-focus") {
+      const week = issue.action.week ?? nextIsoWeek();
+      const [existingFocusYaml, existingWeeklyPlan] = await Promise.all([
+        this.app.vault.adapter.read(FOCUS_WEEK_PATH).catch(() => ""),
+        this.app.vault.adapter.read(focusWeeklyPlanPath(week)).catch(() => ""),
+      ]);
+      const previews = createFocusConfirmationPreviews({
+        week,
+        projects: portfolio.projects,
+        existingFocusYaml,
+        existingWeeklyPlan,
+      });
+      this.confirmAndApplyWrites([previews.yaml, previews.weeklyPlan]);
+      return;
+    }
+
+    const review = deriveWeeklyReview(portfolio, await loadWeeklyWorklogs(this.app));
+    const path = weeklyPlanPath(review.week);
+    const existingContent = weeklyPlanContent || await this.app.vault.adapter.read(path).catch(() => "");
+    this.confirmAndApplyWrite(createWeeklyReviewWritePreview(review, { existingContent }));
   }
 
   private renderPageSwitch(parent: HTMLElement) {

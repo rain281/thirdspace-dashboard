@@ -70,6 +70,7 @@ class FakeElement {
 }
 
 const parent = new FakeElement();
+const issueActions: string[] = [];
 
 renderSystemHealth(parent as unknown as HTMLElement, {
   discoveryPending: 2,
@@ -79,10 +80,24 @@ renderSystemHealth(parent as unknown as HTMLElement, {
   workspaceCount: 8,
   gitRepoCount: 2,
   writeConsistencyIssues: [
-    { label: "焦点 YAML 与周计划不一致", detail: "2026-W25 缺周计划镜像" },
-    { label: "周计划缺复盘", detail: "2026-W24" },
-    { label: "项目状态缺标准 section", detail: "Kora 缺 ## 待决策" },
+    {
+      label: "焦点 YAML 与周计划不一致",
+      detail: "2026-W25 缺周计划镜像",
+      action: { kind: "confirm-weekly-focus", label: "去修复" },
+    },
+    {
+      label: "周计划缺复盘",
+      detail: "2026-W24",
+      action: { kind: "write-weekly-review", label: "去修复" },
+    },
+    {
+      label: "项目状态缺标准 section",
+      detail: "Kora 缺 ## 待决策",
+      action: { kind: "open-projects", label: "查看来源" },
+    },
   ],
+}, {
+  onIssueAction: issue => issueActions.push(issue.action?.kind ?? "none"),
 });
 
 const text = parent.textContent();
@@ -102,12 +117,16 @@ assert.match(text, /最近 4/);
 assert.match(text, /工作区 8/);
 assert.match(text, /仓库 2/);
 assert.match(text, /焦点 YAML 与周计划不一致/);
+assert.match(text, /去修复/);
 assert.doesNotMatch(text, /周计划缺复盘/);
 assert.doesNotMatch(text, /项目状态缺标准 section/);
 assert.doesNotMatch(text, /\+1 条未显示/);
 assert.match(text, /1\/3/);
 assert.ok(parent.findByClass("ts-system-health-prev"), "previous issue button exists");
 assert.ok(parent.findByClass("ts-system-health-next"), "next issue button exists");
+assert.ok(parent.findByClass("ts-system-health-issue-action"), "issue action button exists");
+parent.findByClass("ts-system-health-issue-action")?.click();
+assert.deepEqual(issueActions, ["confirm-weekly-focus"]);
 
 parent.findByClass("ts-system-health-next")?.click();
 const nextText = parent.textContent();
@@ -115,9 +134,20 @@ assert.match(nextText, /2\/3/);
 assert.doesNotMatch(nextText, /焦点 YAML 与周计划不一致/);
 assert.match(nextText, /周计划缺复盘/);
 assert.doesNotMatch(nextText, /项目状态缺标准 section/);
+parent.findByClass("ts-system-health-issue-action")?.click();
+assert.deepEqual(issueActions, ["confirm-weekly-focus", "write-weekly-review"]);
 
 parent.findByClass("ts-system-health-prev")?.click();
 const previousText = parent.textContent();
 assert.match(previousText, /1\/3/);
 assert.match(previousText, /焦点 YAML 与周计划不一致/);
 assert.doesNotMatch(previousText, /周计划缺复盘/);
+
+parent.findByClass("ts-system-health-next")?.click();
+parent.findByClass("ts-system-health-next")?.click();
+const thirdText = parent.textContent();
+assert.match(thirdText, /3\/3/);
+assert.match(thirdText, /项目状态缺标准 section/);
+assert.match(thirdText, /查看来源/);
+parent.findByClass("ts-system-health-issue-action")?.click();
+assert.deepEqual(issueActions, ["confirm-weekly-focus", "write-weekly-review", "open-projects"]);

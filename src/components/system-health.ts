@@ -1,3 +1,16 @@
+export type SystemHealthIssueActionKind = "confirm-weekly-focus" | "write-weekly-review" | "open-projects";
+
+export interface SystemHealthIssueAction {
+  kind: SystemHealthIssueActionKind;
+  label: string;
+}
+
+export interface SystemHealthIssue {
+  label: string;
+  detail: string;
+  action?: SystemHealthIssueAction;
+}
+
 export interface SystemHealthModel {
   discoveryPending: number;
   onboardingPending: number;
@@ -5,13 +18,14 @@ export interface SystemHealthModel {
   recentCount: number;
   workspaceCount: number;
   gitRepoCount: number;
-  writeConsistencyIssues?: Array<{
-    label: string;
-    detail: string;
-  }>;
+  writeConsistencyIssues?: SystemHealthIssue[];
 }
 
-export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel): void {
+export interface SystemHealthActions {
+  onIssueAction?(issue: SystemHealthIssue): void;
+}
+
+export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel, actions: SystemHealthActions = {}): void {
   const issues = model.writeConsistencyIssues ?? [];
   const card = parent.createDiv({ cls: "ts-card ts-compact-card ts-system-health-card" });
   const head = card.createDiv({ cls: "ts-card-head" });
@@ -28,7 +42,7 @@ export function renderSystemHealth(parent: HTMLElement, model: SystemHealthModel
   const issueHead = issuePanel.createDiv({ cls: "ts-system-health-section-head" });
   issueHead.createDiv({ cls: "ts-system-health-section-title", text: "维护信号" });
   if (issues.length > 0) {
-    renderIssueSwitcher(issueHead, issuePanel, issues);
+    renderIssueSwitcher(issueHead, issuePanel, issues, actions);
   } else {
     issueHead.createDiv({ cls: "ts-system-health-section-meta", text: "暂无" });
     const list = issuePanel.createDiv({ cls: "ts-system-health-issues" });
@@ -55,7 +69,8 @@ function metric(parent: HTMLElement, value: string, label: string): void {
 function renderIssueSwitcher(
   head: HTMLElement,
   panel: HTMLElement,
-  issues: Array<{ label: string; detail: string }>,
+  issues: SystemHealthIssue[],
+  actions: SystemHealthActions,
 ): void {
   let selected = 0;
   const controls = head.createDiv({ cls: "ts-system-health-switcher" });
@@ -87,6 +102,21 @@ function renderIssueSwitcher(
     const row = list.createDiv({ cls: "ts-system-health-issue" });
     row.createDiv({ cls: "ts-system-health-issue-title", text: issue.label });
     row.createDiv({ cls: "ts-system-health-issue-detail", text: issue.detail });
+    if (issue.action && actions.onIssueAction) {
+      const btn = row.createEl("button", {
+        cls: "ts-system-health-issue-action",
+        text: issue.action.label,
+        attr: {
+          type: "button",
+          "aria-label": issue.action.label,
+          title: issue.action.label,
+        },
+      });
+      btn.addEventListener("click", event => {
+        event.stopPropagation();
+        actions.onIssueAction?.(issue);
+      });
+    }
   };
 
   prev.disabled = issues.length <= 1;

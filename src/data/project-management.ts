@@ -187,6 +187,11 @@ export interface FocusConfirmationPreviews {
 export interface WriteConsistencyIssue {
   label: string;
   detail: string;
+  action?: {
+    kind: "confirm-weekly-focus" | "write-weekly-review" | "open-projects";
+    label: string;
+    week?: string;
+  };
 }
 
 export interface WriteConsistencyInput {
@@ -410,6 +415,7 @@ export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): Writ
       issues.push({
         label: "焦点 YAML 与周计划不一致",
         detail: `${portfolio.focusWeek.week} 缺 Dashboard 焦点镜像`,
+        action: { kind: "confirm-weekly-focus", label: "去修复", week: portfolio.focusWeek.week },
       });
     }
   }
@@ -417,6 +423,7 @@ export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): Writ
     issues.push({
       label: "周计划缺复盘",
       detail: portfolio.focusWeek.week,
+      action: { kind: "write-weekly-review", label: "去修复" },
     });
   }
   const missingStatusProjects = portfolio.projects
@@ -427,6 +434,7 @@ export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): Writ
     issues.push({
       label: "项目状态缺标准 section",
       detail: missingStatusProjects.slice(0, 3).join(" / "),
+      action: { kind: "open-projects", label: "查看来源" },
     });
   }
   return issues;
