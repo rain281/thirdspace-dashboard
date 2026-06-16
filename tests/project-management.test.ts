@@ -507,6 +507,16 @@ assert.deepEqual(writeConsistencyIssues.map(issue => issue.label), [
   "周计划缺复盘",
   "项目状态缺标准 section",
 ]);
+assert.deepEqual(writeConsistencyIssues.map(issue => issue.action?.kind), [
+  "confirm-weekly-focus",
+  "write-weekly-review",
+  "open-projects",
+]);
+assert.deepEqual(writeConsistencyIssues.map(issue => issue.action?.label), [
+  "去修复",
+  "去修复",
+  "查看来源",
+]);
 
 const blockedPendingDecisionMarkdown = standardMarkdown
   .replace('project: "kora"', 'project: "blocked-decision"')
