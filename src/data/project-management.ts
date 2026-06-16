@@ -190,6 +190,7 @@ export interface WriteConsistencyIssue {
   action?: {
     kind: "confirm-weekly-focus" | "write-weekly-review" | "open-projects";
     label: string;
+    week?: string;
   };
 }
 
@@ -414,7 +415,7 @@ export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): Writ
       issues.push({
         label: "焦点 YAML 与周计划不一致",
         detail: `${portfolio.focusWeek.week} 缺 Dashboard 焦点镜像`,
-        action: { kind: "confirm-weekly-focus", label: "去修复" },
+        action: { kind: "confirm-weekly-focus", label: "去修复", week: portfolio.focusWeek.week },
       });
     }
   }

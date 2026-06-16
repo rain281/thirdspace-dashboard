@@ -512,6 +512,7 @@ assert.deepEqual(writeConsistencyIssues.map(issue => issue.action?.kind), [
   "write-weekly-review",
   "open-projects",
 ]);
+assert.equal(writeConsistencyIssues[0].action?.week, "2026-W25");
 assert.deepEqual(writeConsistencyIssues.map(issue => issue.action?.label), [
   "去修复",
   "去修复",

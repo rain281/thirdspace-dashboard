@@ -512,7 +512,7 @@ export class DashboardView extends ItemView {
   }
 
   private async handleSystemHealthIssueAction(
-    issue: { action?: { kind: "confirm-weekly-focus" | "write-weekly-review" | "open-projects" } },
+    issue: { action?: { kind: "confirm-weekly-focus" | "write-weekly-review" | "open-projects"; week?: string } },
     portfolio: PortfolioModel,
     weeklyPlanContent: string,
   ) {
@@ -526,7 +526,7 @@ export class DashboardView extends ItemView {
     }
 
     if (issue.action.kind === "confirm-weekly-focus") {
-      const week = nextIsoWeek();
+      const week = issue.action.week ?? nextIsoWeek();
       const [existingFocusYaml, existingWeeklyPlan] = await Promise.all([
         this.app.vault.adapter.read(FOCUS_WEEK_PATH).catch(() => ""),
         this.app.vault.adapter.read(focusWeeklyPlanPath(week)).catch(() => ""),
