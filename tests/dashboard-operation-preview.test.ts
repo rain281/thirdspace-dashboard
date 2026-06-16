@@ -4,6 +4,7 @@ import {
   createMaterialsOperationPreview,
   createNewNoteOperationPreview,
   createOnboardingOperationPreview,
+  createProjectDetailTodayOperationPreview,
   createPromoteBacklogOperationPreview,
   createTodayWorklogOperationPreview,
   createTodoAddOperationPreview,
@@ -36,6 +37,13 @@ const promotePreview = createPromoteBacklogOperationPreview({
 assert.equal(promotePreview.title, "加入今日 Todo");
 assert.match(promotePreview.path, /04-项目\/产品系统\/Kora\/未完成事项\.md/);
 assert.match(promotePreview.writeContent, /从项目池移出/);
+
+const projectDetailTodayPreview = createProjectDetailTodayOperationPreview("Kora", "完成只读 Portfolio");
+assert.equal(projectDetailTodayPreview.title, "从项目详情加入今日");
+assert.match(projectDetailTodayPreview.path, /02-日记\/工作日志\/\d{8}_工作日志_周.+\.md/);
+assert.match(projectDetailTodayPreview.writeContent, /项目：Kora/);
+assert.match(projectDetailTodayPreview.writeContent, /写入内容：- \[ \] Kora：完成只读 Portfolio/);
+assert.match(projectDetailTodayPreview.warnings.join(" "), /不会修改项目状态笔记/);
 
 const newNotePreview = createNewNoteOperationPreview("01-收件箱/20260612_untitled.md", "---\ntitle: Untitled\n---\n");
 assert.equal(newNotePreview.title, "创建新笔记");

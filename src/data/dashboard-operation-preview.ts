@@ -66,6 +66,26 @@ export function createPromoteBacklogOperationPreview(item: ProjectBacklogItem): 
   });
 }
 
+export function createProjectDetailTodayOperationPreview(projectName: string, itemText: string): ControlledWritePreview {
+  const text = todayTodoTextFromProject(projectName, itemText);
+  return createOperationPreview({
+    path: getTodayWorklogPath(),
+    title: "从项目详情加入今日",
+    summary: "确认后追加到今日工作日志 ## 今日Todo。",
+    content: [
+      `目标文件：${getTodayWorklogPath()}`,
+      "目标 section：## 今日Todo",
+      `项目：${projectName}`,
+      `来源条目：${itemText}`,
+      `写入内容：- [ ] ${text}`,
+    ].join("\n"),
+    warnings: [
+      "确认后只会写入今日工作日志，不会修改项目状态笔记。",
+      "如今日 Todo 已存在相同内容，写入函数会保持幂等不重复追加。",
+    ],
+  });
+}
+
 export function createNewNoteOperationPreview(path: string, content: string): ControlledWritePreview {
   return createOperationPreview({
     path,
@@ -78,6 +98,16 @@ export function createNewNoteOperationPreview(path: string, content: string): Co
     ].join("\n"),
     warnings: ["取消预览不会创建新笔记。"],
   });
+}
+
+function todayTodoTextFromProject(projectName: string, itemText: string): string {
+  const project = projectName.trim();
+  const text = itemText.trim();
+  if (!project) return text;
+  const normalized = text.toLowerCase();
+  const prefix = project.toLowerCase();
+  if (normalized.startsWith(`${prefix}:`) || normalized.startsWith(`${prefix}：`)) return text;
+  return `${project}：${text}`;
 }
 
 export function createTodayWorklogOperationPreview(path: string): ControlledWritePreview {

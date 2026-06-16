@@ -3,6 +3,8 @@ import {
   currentIsoWeek,
   createFocusConfirmationPreviews,
   createProjectDetailActionPreview,
+  createProjectDecisionResolutionPreview,
+  createProjectRiskResolutionPreview,
   deriveWriteConsistencyIssues,
   deriveManagedProjects,
   derivePortfolioSummary,
@@ -222,6 +224,74 @@ const riskPreview = createProjectDetailActionPreview({
 assert.equal(riskPreview.title, "新增 Pilot 风险");
 assert.match(riskPreview.after, /## 风险与阻塞/);
 assert.match(riskPreview.writeContent, /Mail\.app 权限仍未确认。/);
+
+const resolvedRiskPreview = createProjectRiskResolutionPreview({
+  project: {
+    id: "pilot",
+    name: "Pilot",
+    lifecycle: "active",
+    statusNote: "04-项目/产品系统/Pilot/Pilot项目状态.md",
+  },
+  text: "Mail.app 权限仍未确认。",
+  existingContent: [
+    "# Pilot 项目状态",
+    "",
+    "## 风险与阻塞",
+    "",
+    "- [ ] Mail.app 权限仍未确认。",
+    "- [ ] MLX 链接仍失败。",
+    "",
+    "## 待决策",
+    "",
+    "- [ ] 是否先做只读版。",
+    "",
+  ].join("\n"),
+  now: new Date("2026-06-16T10:20:00+08:00"),
+});
+
+assert.equal(resolvedRiskPreview.title, "解除 Pilot 风险");
+assert.match(resolvedRiskPreview.summary, /更新 ## 风险与阻塞/);
+assert.match(resolvedRiskPreview.after, /- \[x\] Mail\.app 权限仍未确认。 ✅ 2026-06-16/);
+assert.match(resolvedRiskPreview.after, /- \[ \] MLX 链接仍失败。/);
+assert.match(resolvedRiskPreview.after, /## 待决策\n\n- \[ \] 是否先做只读版。/);
+assert.match(resolvedRiskPreview.writeContent, /原风险：Mail\.app 权限仍未确认。/);
+assert.match(resolvedRiskPreview.writeContent, /解除后：- \[x\] Mail\.app 权限仍未确认。 ✅ 2026-06-16/);
+
+const resolvedDecisionPreview = createProjectDecisionResolutionPreview({
+  project: {
+    id: "pilot",
+    name: "Pilot",
+    lifecycle: "active",
+    statusNote: "04-项目/产品系统/Pilot/Pilot项目状态.md",
+  },
+  text: "是否先做只读版。",
+  existingContent: [
+    "# Pilot 项目状态",
+    "",
+    "## 待决策",
+    "",
+    "- [ ] 是否先做只读版。",
+    "- [ ] 是否接入 Mail.app。",
+    "",
+    "## 决策记录",
+    "",
+    "- 2026-06-12 采用 Xcode-first。",
+    "",
+    "## 交付门禁",
+    "",
+    "- [ ] npm run build",
+    "",
+  ].join("\n"),
+  now: new Date("2026-06-16T10:20:00+08:00"),
+});
+
+assert.equal(resolvedDecisionPreview.title, "标记 Pilot 已决策");
+assert.match(resolvedDecisionPreview.summary, /移动 ## 待决策 到 ## 决策记录/);
+assert.doesNotMatch(resolvedDecisionPreview.after, /- \[ \] 是否先做只读版。/);
+assert.match(resolvedDecisionPreview.after, /## 待决策\n\n- \[ \] 是否接入 Mail\.app。/);
+assert.match(resolvedDecisionPreview.after, /## 决策记录\n\n- 2026-06-12 采用 Xcode-first。\n- \[x\] 是否先做只读版。 ✅ 2026-06-16/);
+assert.match(resolvedDecisionPreview.writeContent, /原待决策：是否先做只读版。/);
+assert.match(resolvedDecisionPreview.writeContent, /决策记录：- \[x\] 是否先做只读版。 ✅ 2026-06-16/);
 
 assert.throws(() => createProjectDetailActionPreview({
   project: {

@@ -209,6 +209,13 @@ export interface ProjectDetailActionPreviewInput {
   existingContent: string;
 }
 
+export interface ProjectDetailResolutionPreviewInput {
+  project: Pick<ManagedProject, "id" | "name" | "lifecycle" | "statusNote">;
+  text: string;
+  existingContent: string;
+  now?: Date;
+}
+
 export function parseFocusWeekYaml(content: string, now = new Date()): FocusWeek {
   if (!content.trim()) return emptyFocusWeek(now);
   const lines = content.split("\n");
@@ -336,6 +343,56 @@ export function createProjectDetailActionPreview(input: ProjectDetailActionPrevi
       "不会修改归档项目，也不会写入代码仓库文件。",
     ],
   });
+}
+
+export function createProjectRiskResolutionPreview(input: ProjectDetailResolutionPreviewInput): ControlledWritePreview {
+  assertWritableProject(input.project);
+  const date = localDate(input.now ?? new Date());
+  const resolved = `- [x] ${input.text.trim()} ✅ ${date}`;
+  const after = updateTaskInSection(input.existingContent, "风险与阻塞", input.text, resolved);
+  return {
+    path: input.project.statusNote,
+    title: `解除 ${input.project.name} 风险`,
+    summary: "更新 ## 风险与阻塞 中的风险状态",
+    before: input.existingContent,
+    after,
+    writeContent: [
+      `目标 section：## 风险与阻塞`,
+      `原风险：${input.text.trim()}`,
+      `解除后：${resolved}`,
+    ].join("\n"),
+    diff: simplePreviewDiff(input.existingContent, after),
+    warnings: [
+      "只会修改项目状态笔记的 ## 风险与阻塞 section。",
+      "不会修改归档项目，也不会写入代码仓库文件。",
+    ],
+  };
+}
+
+export function createProjectDecisionResolutionPreview(input: ProjectDetailResolutionPreviewInput): ControlledWritePreview {
+  assertWritableProject(input.project);
+  const date = localDate(input.now ?? new Date());
+  const decisionRecord = `- [x] ${input.text.trim()} ✅ ${date}`;
+  const afterPending = removeTaskFromSection(input.existingContent, "待决策", input.text);
+  const after = appendLineToSection(afterPending, "决策记录", decisionRecord);
+  return {
+    path: input.project.statusNote,
+    title: `标记 ${input.project.name} 已决策`,
+    summary: "移动 ## 待决策 到 ## 决策记录",
+    before: input.existingContent,
+    after,
+    writeContent: [
+      `源 section：## 待决策`,
+      `目标 section：## 决策记录`,
+      `原待决策：${input.text.trim()}`,
+      `决策记录：${decisionRecord}`,
+    ].join("\n"),
+    diff: simplePreviewDiff(input.existingContent, after),
+    warnings: [
+      "确认后会从 ## 待决策 移出该条目，并追加到 ## 决策记录。",
+      "不会修改归档项目，也不会写入代码仓库文件。",
+    ],
+  };
 }
 
 export function deriveWriteConsistencyIssues(input: WriteConsistencyInput): WriteConsistencyIssue[] {
@@ -484,11 +541,123 @@ function projectDetailActionConfig(action: ProjectDetailAction, projectName: str
       marker: "project-risk",
     };
   }
-  return {
-    title: `新增 ${projectName} 待决策`,
-    section: "待决策",
-    marker: "project-decision",
-  };
+  if (action === "decision") {
+    return {
+      title: `新增 ${projectName} 待决策`,
+      section: "待决策",
+      marker: "project-decision",
+    };
+  }
+  throw new Error(`unsupported text action: ${action}`);
+}
+
+function assertWritableProject(project: Pick<ManagedProject, "lifecycle" | "statusNote">): void {
+  if (project.lifecycle === "archived") throw new Error("archived projects are read-only");
+  if (!project.statusNote) throw new Error("project status note is missing");
+}
+
+function updateTaskInSection(markdown: string, section: string, text: string, replacement: string): string {
+  const normalized = normalizeTrailingNewline(markdown);
+  const lines = normalized.split("\n");
+  const bounds = lineSectionBounds(lines, section);
+  for (let i = bounds.start; i < bounds.end; i++) {
+    if (!isMatchingOpenTask(lines[i], text)) continue;
+    lines[i] = replacement;
+    return normalizeTrailingNewline(lines.join("\n"));
+  }
+  throw new Error(`target task not found in ## ${section}`);
+}
+
+function removeTaskFromSection(markdown: string, section: string, text: string): string {
+  const normalized = normalizeTrailingNewline(markdown);
+  const lines = normalized.split("\n");
+  const bounds = lineSectionBounds(lines, section);
+  for (let i = bounds.start; i < bounds.end; i++) {
+    if (!isMatchingOpenTask(lines[i], text)) continue;
+    lines.splice(i, 1);
+    return normalizeTrailingNewline(lines.join("\n"));
+  }
+  throw new Error(`target task not found in ## ${section}`);
+}
+
+function appendLineToSection(markdown: string, section: string, line: string): string {
+  const normalized = normalizeTrailingNewline(markdown);
+  const lines = normalized.split("\n");
+  let bounds = lineSectionBounds(lines, section);
+  if (bounds.heading < 0) {
+    const base = trimTrailingEmptyLines(lines);
+    base.push("", `## ${section}`, "", line, "");
+    return normalizeTrailingNewline(base.join("\n"));
+  }
+  if (lines.some(existing => existing.trim() === line.trim())) return normalized;
+  let insertAt = bounds.end;
+  while (insertAt > bounds.start && lines[insertAt - 1]?.trim() === "") insertAt--;
+  lines.splice(insertAt, 0, line);
+  return normalizeTrailingNewline(lines.join("\n"));
+}
+
+function lineSectionBounds(lines: string[], section: string): { heading: number; start: number; end: number } {
+  const heading = lines.findIndex(line => line.trim() === `## ${section}`);
+  if (heading < 0) return { heading: -1, start: lines.length, end: lines.length };
+  const next = lines.findIndex((line, index) => index > heading && /^##\s+/.test(line));
+  return { heading, start: heading + 1, end: next < 0 ? lines.length : next };
+}
+
+function isMatchingOpenTask(line: string, text: string): boolean {
+  const task = line.match(/^\s*[-*]\s+\[ \]\s+(.+)$/);
+  if (!task) return false;
+  return cleanStatusTaskText(task[1]) === cleanStatusTaskText(text);
+}
+
+function cleanStatusTaskText(text: string): string {
+  return text.replace(/✅\s+\d{4}-\d{2}-\d{2}/g, "").trim();
+}
+
+function localDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeTrailingNewline(text: string): string {
+  return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+function trimTrailingEmptyLines(lines: string[]): string[] {
+  const next = [...lines];
+  while (next.length > 0 && next[next.length - 1]?.trim() === "") next.pop();
+  return next;
+}
+
+function simplePreviewDiff(before: string, after: string): string {
+  if (before === after) return "";
+  const beforeLines = before.split("\n");
+  const afterLines = after.split("\n");
+  const prefixLength = commonPrefixLength(beforeLines, afterLines);
+  const suffixLength = commonSuffixLength(beforeLines, afterLines, prefixLength);
+  return [
+    ...beforeLines.slice(prefixLength, beforeLines.length - suffixLength).map(line => `-${line}`),
+    ...afterLines.slice(prefixLength, afterLines.length - suffixLength).map(line => `+${line}`),
+  ].join("\n");
+}
+
+function commonPrefixLength(left: string[], right: string[]): number {
+  let index = 0;
+  while (index < left.length && index < right.length && left[index] === right[index]) index++;
+  return index;
+}
+
+function commonSuffixLength(left: string[], right: string[], prefixLength: number): number {
+  let count = 0;
+  while (
+    count < left.length - prefixLength
+    && count < right.length - prefixLength
+    && left[left.length - 1 - count] === right[right.length - 1 - count]
+  ) {
+    count++;
+  }
+  return count;
 }
 
 function escapeYaml(value: string): string {
