@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  ensureTodayWorklog,
   filterManagedProjectIndexEntries,
   getGitActivity,
   getProjectActivity,
@@ -446,7 +447,7 @@ const liveTimelineExecutor: LiveGitExecutor = async (_command, args) => {
 };
 
 setLiveGitExecutorForTests(liveTimelineExecutor);
-const liveTodayWorklog = await loadTodayWorklog(liveTimelineApp as any);
+const liveTodayWorklog = await loadTodayWorklog(liveTimelineApp as any, new Date("2026-06-15T12:00:00+08:00"));
 setLiveGitExecutorForTests(null);
 
 const liveTimelineGitItems = liveTodayWorklog?.timeline.filter(item => item.kind === "git") ?? [];
@@ -454,3 +455,39 @@ assert.equal(liveTimelineGitItems.length, 1);
 assert.equal(liveTimelineGitItems[0].title, "rain: docs: live timeline");
 assert.equal(liveTimelineGitItems[0].targetPath, "04-项目/产品系统/ThirdSpace Dashboard/项目管理系统改造/live.md");
 assert.equal(liveTimelineGitItems[0].subtitle, "rain · main · 1212121 · 1 files");
+
+let createdWorklogContent = "";
+const createWorklogApp = {
+  vault: {
+    getAbstractFileByPath() {
+      return null;
+    },
+    async create(path: string, content: string) {
+      createdWorklogContent = content;
+      return {
+        path,
+        basename: path.split("/").pop()?.replace(/\.md$/i, "") ?? path,
+        stat: { ctime: 0, mtime: 0, size: content.length },
+      };
+    },
+  },
+};
+
+await ensureTodayWorklog(createWorklogApp as any);
+assert.deepEqual(
+  createdWorklogContent
+    .split("\n")
+    .filter(line => line.startsWith("## "))
+    .map(line => line.trim()),
+  [
+    "## 今日重点",
+    "## 今日Todo",
+    "## 重点记录",
+    "## 今日产出",
+    "## Git 提交",
+    "## 决策",
+    "## 问题与风险",
+    "## 下一步",
+    "## Agent 产出",
+  ],
+);

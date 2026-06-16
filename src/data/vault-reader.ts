@@ -174,18 +174,16 @@ const DEFAULT_WORKSPACES = [
 const WEEKDAYS = ["日","一","二","三","四","五","六"];
 
 // ── Worklog path helper ──────────────────────────────────────
-export function getTodayWorklogPath(): string {
-  const now = new Date();
+export function getTodayWorklogPath(now = new Date()): string {
   const ymd = localDateCompact(now);
   return `02-日记/工作日志/${ymd}_工作日志_周${WEEKDAYS[now.getDay()]}.md`;
 }
 
-export async function ensureTodayWorklog(app: App): Promise<TFile> {
-  const path = getTodayWorklogPath();
+export async function ensureTodayWorklog(app: App, now = new Date()): Promise<TFile> {
+  const path = getTodayWorklogPath(now);
   const existing = app.vault.getAbstractFileByPath(path) as TFile | null;
   if (existing) return existing;
 
-  const now = new Date();
   const ts = localTimestamp(now);
   const ds = localDateStr(now);
   const wd = WEEKDAYS[now.getDay()];
@@ -212,17 +210,15 @@ export async function ensureTodayWorklog(app: App): Promise<TFile> {
     "",
     "## 今日产出",
     "",
-    "## Git Hook 采集",
-    "",
-    "## Git 历史索引",
+    "## Git 提交",
     "",
     "## 决策",
+    "",
+    "## 问题与风险",
     "",
     "## 下一步",
     "",
     "## Agent 产出",
-    "",
-    "## Git 提交",
     "",
   ].join("\n");
 
@@ -1044,12 +1040,11 @@ export async function renameTodoInWorklog(app: App, item: TodoItem, newText: str
 }
 
 // ── Today's worklog entries (## 今日重点 / 今日Todo / 重点记录 / event stream) ──
-export async function loadTodayWorklog(app: App): Promise<TodayWorklog | null> {
+export async function loadTodayWorklog(app: App, now = new Date()): Promise<TodayWorklog | null> {
   try {
-    const now = new Date();
     const todayDate = localDateStr(now);
     const todayCompact = todayDate.replace(/-/g,"");
-    const logPath = await findTodayWorklogPath(app, todayCompact);
+    const logPath = await findTodayWorklogPath(app, todayCompact, now);
     if (!logPath) return null;
     const md = await app.vault.adapter.read(logPath);
     const highlights = parseHighlights(md);
@@ -1104,8 +1099,8 @@ export async function loadWeeklyWorklogs(app: App, now = new Date()): Promise<We
   return worklogs;
 }
 
-async function findTodayWorklogPath(app: App, todayCompact: string): Promise<string | null> {
-  const exact = getTodayWorklogPath();
+async function findTodayWorklogPath(app: App, todayCompact: string, now = new Date()): Promise<string | null> {
+  const exact = getTodayWorklogPath(now);
   if (await app.vault.adapter.exists(exact).catch(() => false)) return exact;
 
   const dir = "02-日记/工作日志";
